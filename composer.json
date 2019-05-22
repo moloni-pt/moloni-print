@@ -1,0 +1,29 @@
+{
+  "name": "Moloni/MoloniPrint",
+  "description": "Library to create JSON for Moloni Print Client based on a document/cashflow object",
+  "type": "library",
+  "authors": [
+    {
+      "name": "Nuno Almeida",
+      "email": "nuno@moloni.com",
+      "role": "Developer"
+    }
+  ],
+  "keywords": [
+    "Moloni",
+    "esc-pos",
+    "Moloni Print Client"
+  ],
+  "license": [
+    ""
+  ],
+  "require": {
+    "php": ">=5.4",
+    "ext-openssl": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "MoloniPrint\\": "src"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "name": "Moloni/MoloniPrint",
+  "name": "moloni/moloni-print",
   "description": "Library to create JSON for Moloni Print Client based on a document/cashflow object",
   "type": "library",
   "authors": [

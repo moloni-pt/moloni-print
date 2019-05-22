@@ -15,7 +15,7 @@
     "Moloni Print Client"
   ],
   "license": [
-    ""
+    "MIT"
   ],
   "require": {
     "php": ">=5.4",

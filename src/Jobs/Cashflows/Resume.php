@@ -7,12 +7,31 @@ use MoloniPrint\Jobs\Cashflow;
 use MoloniPrint\Table\Table;
 use MoloniPrint\Utils\Tools;
 
-class Closing extends Cashflow
+class Resume extends Cashflow
 {
 
+    public $drawingSchema = [
+        'image',
+        'header',
+        'details',
+        'linebreak',
+        'resume',
+        'linebreak',
+        'sales',
+        'linebreak',
+        'expenses',
+        'linebreak',
+        'createdAt',
+        'linebreak',
+        'processedBy',
+        'poweredBy'
+    ];
+
+    private $resume = [];
     private $incoming = [];
     private $outgoing = [];
 
+    private $totalIncoming = 0;
     private $totalOutgoing = 0;
 
     /**
@@ -31,7 +50,7 @@ class Closing extends Cashflow
         $this->parseMovements();
         $this->parsePayments();
 
-        $this->drawFromScheme($this->cashflowClosingSchema);
+        $this->drawFromScheme($this->drawingSchema);
         $this->finish();
 
         return $this->builder->getPrintJob('json');
@@ -44,6 +63,16 @@ class Closing extends Cashflow
         $this->cashflowDate();
     }
 
+    public function cashflowType()
+    {
+        $this->builder->textFont('C');
+        $this->builder->textAlign('RIGHT');
+        $this->builder->textDouble(true, true);
+        $this->builder->textStyle(false, false, true);
+        $this->builder->text($this->labels->cashflow_resume);
+        $this->linebreak();
+    }
+
     /**
      * Show cashflow last modified date
      */
@@ -53,7 +82,7 @@ class Closing extends Cashflow
         $this->builder->textAlign('RIGHT');
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
-        $this->builder->text($this->labels->date . ': ' . Tools::dateFormat($this->cashflow['parent']['date']) . ' - ' . Tools::dateFormat($this->cashflow['date']));
+        $this->builder->text($this->labels->period . ': ' . Tools::dateFormat($this->cashflow['date']) . ' - ' . Tools::dateFormat(date('d-m-Y H:i')));
         $this->linebreak();
     }
 
@@ -63,7 +92,7 @@ class Closing extends Cashflow
         $this->builder->textAlign('');
         $this->builder->textDouble(true, true);
         $this->builder->textStyle(false, false, true);
-        $this->builder->text($this->labels->cashflow_starting_amount);
+        $this->builder->text($this->labels->resume);
         $this->linebreak();
 
         $table = new Table($this->builder, $this->printer);
@@ -72,15 +101,18 @@ class Closing extends Cashflow
         $table->addLineSplit();
 
         $table->addCell($this->labels->initial, ['condensed' => true, 'emphasized' => true]);
-        $table->addCell(Tools::priceFormat($this->cashflow['parent']['value'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
-
-        $table->addCell($this->labels->final, ['condensed' => true, 'emphasized' => true]);
         $table->addCell(Tools::priceFormat($this->cashflow['value'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
+
+        $table->addCell($this->labels->total_sales, ['condensed' => true, 'emphasized' => true]);
+        $table->addCell(Tools::priceFormat($this->totalIncoming, $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
+
+        $table->addCell($this->labels->total_expenses, ['condensed' => true, 'emphasized' => true]);
+        $table->addCell(Tools::priceFormat($this->totalOutgoing, $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
 
         $table->addLineSplit();
 
         $table->addCell($this->labels->difference, ['condensed' => true, 'emphasized' => true]);
-        $table->addCell(Tools::priceFormat(($this->cashflow['value'] - $this->cashflow['parent']['value']), $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
+        $table->addCell(Tools::priceFormat(($this->cashflow['value'] + $this->totalIncoming - $this->totalOutgoing), $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
 
         $table->drawTable();
         $this->linebreak();
@@ -89,9 +121,6 @@ class Closing extends Cashflow
     public function sales()
     {
         if (!empty($this->incoming) && is_array($this->incoming)) {
-            $totalDeclared = 0;
-            $totalInvoiced = 0;
-
             $this->builder->textFont('C');
             $this->builder->textAlign('');
             $this->builder->textDouble(true, true);
@@ -100,27 +129,19 @@ class Closing extends Cashflow
             $this->linebreak();
 
             $table = new Table($this->builder, $this->printer);
-            $table->addColumns([null, 12, 12, 12]);
+            $table->addColumns([null, 20]);
 
-            $table->addCells(['', $this->labels->declared, $this->labels->invoiced, $this->labels->difference], ['condensed' => true, 'emphasized' => true, 'alignment' => 'RIGHT']);
             $table->addLineSplit();
 
             foreach ($this->incoming as $paymentMethod) {
-                $totalDeclared += $paymentMethod['declared'];
-                $totalInvoiced += $paymentMethod['invoiced'];
-
                 $table->addCell($paymentMethod['name'], ['condensed' => true]);
-                $table->addCell(Tools::priceFormat($paymentMethod['declared'], $this->currency), ['alignment' => 'RIGHT', 'condensed' => true]);
-                $table->addCell(Tools::priceFormat($paymentMethod['invoiced'], $this->currency), ['alignment' => 'RIGHT', 'condensed' => true]);
-                $table->addCell(Tools::priceFormat(($paymentMethod['declared'] - $paymentMethod['invoiced']), $this->currency), ['alignment' => 'RIGHT', 'condensed' => true]);
+                $table->addCell(Tools::priceFormat($paymentMethod['value'], $this->currency), ['alignment' => 'RIGHT', 'condensed' => true]);
             }
 
             $table->addLineSplit();
 
             $table->addCell($this->labels->total, ['condensed' => true, 'emphasized' => true]);
-            $table->addCell(Tools::priceFormat($totalDeclared, $this->currency), ['condensed' => true, 'emphasized' => true, 'alignment' => 'RIGHT']);
-            $table->addCell(Tools::priceFormat($totalInvoiced, $this->currency), ['condensed' => true, 'emphasized' => true, 'alignment' => 'RIGHT']);
-            $table->addCell(Tools::priceFormat($totalDeclared - $totalInvoiced, $this->currency), ['condensed' => true, 'emphasized' => true, 'alignment' => 'RIGHT']);
+            $table->addCell(Tools::priceFormat($this->totalIncoming), ['condensed' => true, 'emphasized' => true, 'alignment' => 'RIGHT']);
 
             $table->drawTable();
             $this->linebreak();
@@ -143,8 +164,8 @@ class Closing extends Cashflow
             $table->addLineSplit();
 
             foreach ($this->outgoing as $payment) {
-                $table->addCell($payment['name'], ['condensed' => true, 'emphasized' => true]);
-                $table->addCell($payment['value'], ['condensed' => true, 'alignment' => 'RIGHT']);
+                $table->addCell($payment['name'], ['condensed' => true]);
+                $table->addCell(Tools::priceFormat($payment['value'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
             }
 
             $table->addLineSplit();
@@ -162,22 +183,21 @@ class Closing extends Cashflow
         foreach ($this->cashflow['associated_movements'] as $movement) {
             if ($movement['type_id'] == 2) {
                 // For sales
+                $this->totalIncoming += $movement['value'];
                 $totalValue = $movement['value'];
                 $totalAssociatedValue = 0;
 
                 if (!empty($movement['payments']) && is_array($movement['payments'])) {
                     foreach ($movement['payments'] as $payment) {
                         $this->incoming[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
-                        $this->incoming[$payment['payment_method_id']]['invoiced'] += $payment['value'];
-                        $this->incoming[$payment['payment_method_id']]['declared'] += 0;
+                        $this->incoming[$payment['payment_method_id']]['value'] += $payment['value'];
                         $totalAssociatedValue += $payment['value'];
                     }
                 }
 
                 if ($totalValue > $totalAssociatedValue) {
                     $this->incoming[0]['name'] = $this->labels->undifferentiated;
-                    $this->incoming[0]['invoiced'] += $totalValue - $totalAssociatedValue;
-                    $this->incoming[0]['declared'] += 0;
+                    $this->incoming[0]['value'] += $totalValue - $totalAssociatedValue;
                 }
 
             } else {
@@ -188,20 +208,16 @@ class Closing extends Cashflow
 
                 if (isset($movement['payments']) && is_array($movement['payments'])) {
                     foreach ($movement['payments'] as $payment) {
-                        $this->outgoing[] = [
-                            'name' => $payment['payment_method']['name'],
-                            'value' => Tools::priceFormat($payment['value'], $this->currency)
-                        ];
+                        $this->outgoing[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
+                        $this->outgoing[$payment['payment_method_id']]['value'] += $payment['value'];
 
                         $totalAssociatedValue += $payment['value'];
                     }
                 }
 
                 if ($totalValue > $totalAssociatedValue) {
-                    $this->outgoing[] = [
-                        'name' => $this->labels->undifferentiated,
-                        'value' => Tools::priceFormat(($totalValue - $totalAssociatedValue), $this->currency)
-                    ];
+                    $this->outgoing[0]['name'] = $this->labels->undifferentiated;
+                    $this->outgoing[0]['value'] += $totalValue - $totalAssociatedValue;
                 }
             }
         }
@@ -211,9 +227,8 @@ class Closing extends Cashflow
     {
         if (!empty($this->cashflow['payments']) && is_array($this->cashflow['payments'])) {
             foreach ($this->cashflow['payments'] as $payment) {
-                $this->incoming[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
-                $this->incoming[$payment['payment_method_id']]['invoiced'] += 0;
-                $this->incoming[$payment['payment_method_id']]['declared'] += $payment['value'];
+                $this->resume[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
+                $this->resume[$payment['payment_method_id']]['value'] += $payment['value'];
             }
         }
     }

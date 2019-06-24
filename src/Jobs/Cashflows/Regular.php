@@ -114,7 +114,7 @@ class Regular extends Cashflow
             }
         }
 
-        if ($totalValue > $totalAssociatedValue) {
+        if ($totalValue == 0 || $totalValue > $totalAssociatedValue) {
             $this->payments[] = [
                 'name' => $this->labels->undifferentiated,
                 'value' => Tools::priceFormat(($totalValue - $totalAssociatedValue), $this->currency)

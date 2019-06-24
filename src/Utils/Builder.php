@@ -90,7 +90,7 @@ class Builder
             $image = new \Imagick($url);
             $image->setImageFormat("png");
 
-            $imageWidth = $image->getImageWidth();
+            $imageWidth = $maxWidth;
             $imageHeight = ceil($maxWidth * $image->getImageHeight() / $image->getImageWidth());
 
             if ($imageHeight > ($imageWidth / 3)) {

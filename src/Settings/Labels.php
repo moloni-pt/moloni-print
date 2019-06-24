@@ -13,12 +13,14 @@ class Labels
     public $adjustment = "Acertos";
     public $associated_documents = "Documentos relacionados";
     public $at_code = "Código AT";
+    public $balance = "Saldo";
     public $beginning = "Início";
     public $cashflow = "Movimento de caixa";
     public $cashflow_close = "Fecho de caixa";
     public $cashflow_in = "Entrada de caixa";
     public $cashflow_open = "Abertura de caixa";
     public $cashflow_out = "Saída de caixa";
+    public $cashflow_resume = "Consulta de caixa";
     public $cashflow_starting_amount = "Fundo de caixa";
     public $commercial_registration_number = "R.C.C. Nº";
     public $company = "Empresa";
@@ -48,6 +50,7 @@ class Labels
     public $original = "Original";
     public $our_reference = "Enc./Orç.";
     public $payments = "Pagamentos";
+    public $period = "Período";
     public $phone = "Telefone";
     public $powered_by = "Powered by Moloni | https://moloni.pt";
     public $price = "Preço";
@@ -59,6 +62,7 @@ class Labels
     public $pvp_unit_short = "PVP Unit.";
     public $qty = "Qtd.";
     public $reference_short = "Refª";
+    public $resume = "Resumo";
     public $sales = "Vendas";
     public $salesman = "Vendedor";
     public $second_way = "2ª Via";
@@ -69,6 +73,8 @@ class Labels
     public $terminal = "Terminal";
     public $total = "Total";
     public $total_discounts = "Valor do Desconto";
+    public $total_expenses = "Total despesas";
+    public $total_sales = "Total vendas";
     public $undifferentiated = "Indiferenciado";
     public $value = "Valor";
     public $vehicle = "Viatura";

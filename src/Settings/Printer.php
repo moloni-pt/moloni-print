@@ -60,7 +60,7 @@ class Printer
 
     /**
      * Line split character for line draw
-     * @var string 
+     * @var string
      */
     public $tableSplitChar = '─';
 
@@ -79,43 +79,48 @@ class Printer
     private function setPrinterSettings($printer)
     {
         if (!empty($printer) && is_array($printer)) {
-            if(isset($printer['normalWidth'])) {
-                $this->normalWidth = (int) $printer['normalWidth'];
+            if (isset($printer['normalWidth']) && $printer['normalWidth'] > 0 && $printer['normalWidth'] < 1000) {
+                $this->normalWidth = (int)$printer['normalWidth'];
             }
 
-            if(isset($printer['condensedWidth'])) {
-                $this->condensedWidth = (int) $printer['condensedWidth'];
+            if (isset($printer['condensedWidth']) && $printer['condensedWidth'] > 0 && $printer['condensedWidth'] < 1000) {
+                $this->condensedWidth = (int)$printer['condensedWidth'];
             }
 
-            if(isset($printer['dotWidth'])) {
-                $this->dotWidth = (int) $printer['dotWidth'];
+            if (isset($printer['dotWidth']) && $printer['dotWidth'] > 0 && $printer['dotWidth'] < 1000) {
+                $this->dotWidth = (int)$printer['dotWidth'];
             }
 
-            if(isset($printer['hasDrawer'])) {
+            if (isset($printer['hasDrawer'])) {
                 $this->hasDrawer = ($printer['hasDrawer'] || $printer['hasDrawer'] == 'true' ? true : false);
             }
 
-            if(isset($printer['hasCutter'])) {
+            if (isset($printer['hasCutter'])) {
                 $this->hasCutter = ($printer['hasCutter'] || $printer['hasCutter'] == 'true' ? true : false);
             }
 
-            if(isset($printer['lowDensity'])) {
-                $this->lowDensity = ($printer['lowDensity'] || $printer['lowDensity'] == 'true' ? true : false);
+            if (isset($printer['lowDensity']) || isset($printer['imagePrintMode'])) {
+                if (isset($printer['lowDensity'])) {
+                    $this->lowDensity = ($printer['lowDensity'] || $printer['lowDensity'] == 'true' ? true : false);
+                }
+
+                if (isset($printer['imagePrintMode'])) {
+                    $this->imagePrintMode = $printer['imagePrintMode'];
+                }
+            } elseif (isset($printer['printMode'])) {
+                $this->lowDensity = ($printer['printMode'] > 3) ? true : false;
+                $this->imagePrintMode = (int)(($printer['printMode'] > 3) ? ($printer['printMode'] - 4) : $printer['printMode']);
             }
 
-            if(isset($printer['imagePrintMode'])) {
-                $this->lowDensity = $printer['imagePrintMode'];
+            if (isset($printer['replaceAccentedChars'])) {
+                $this->replaceAccentedChars = ($printer['replaceAccentedChars'] || $printer['replaceAccentedChars'] == 'true' ? true : false);
+            }
+            if (isset($printer['alternativeCharset'])) {
+                $this->alternativeCharset = ($printer['alternativeCharset'] || $printer['alternativeCharset'] == 'true' ? true : false);
             }
 
-            if(isset($printer['replaceAccentedChars'])) {
-                $this->lowDensity = ($printer['replaceAccentedChars'] || $printer['replaceAccentedChars'] == 'true' ? true : false);
-            }
-            if(isset($printer['alternativeCharset'])) {
-                $this->lowDensity = ($printer['alternativeCharset'] || $printer['alternativeCharset'] == 'true' ? true : false);
-            }
-
-            if(isset($printer['tableSplitChar'])) {
-                $this->replaceAccentedChars = $printer['tableSplitChar'];
+            if (isset($printer['tableSplitChar'])) {
+                $this->tableSplitChar = $printer['tableSplitChar'];
             }
         }
     }

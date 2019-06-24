@@ -603,7 +603,7 @@ class Document extends Common
                 $this->deductions[$raw['deduction_name']] = ($product['unitPriceWithDiscounts'] * $raw['deduction']) / 100;
             }
 
-            $product['discount'] = Tools::priceFormat($product['discount'], '%');
+            $product['discount'] = floatval(round($product['discount'], 2)) . "%";
             $product['unitPrice'] = Tools::priceFormat($product['unitPrice'], $this->currency);
             $product['unitPriceWithTaxes'] = Tools::priceFormat($product['unitPriceWithTaxes'], $this->currency);
             $product['totalPrice'] = Tools::priceFormat($product['totalPrice'], $this->currency);

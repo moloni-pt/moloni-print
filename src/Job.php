@@ -24,7 +24,7 @@ class Job
      * @param $labels array From documents/getPrintingLabels call
      * @param $printer array From printers/getOne call
      */
-    public function __construct($company, $terminal, $labels = [], $printer = [])
+    public function __construct($company, $terminal = [], $labels = [], $printer = [])
     {
         $this->company = $company;
         $this->terminal = $terminal;
@@ -43,6 +43,11 @@ class Job
         return $printingDocument;
     }
 
+    /**
+     * @param array $document
+     * @param array $products
+     * @return array|string
+     */
     public function OfferTicket(Array $document, $products = [])
     {
         $printingDocument = (new OfferTicket($this))->create($document, $products);
@@ -57,6 +62,18 @@ class Job
             $printingDocument = (new Jobs\Cashflows\Regular($this))->create($cashflow);
         }
 
+        return $printingDocument;
+    }
+
+    public function CashflowResume(Array $cashflow)
+    {
+        $printingDocument = (new Jobs\Cashflows\Resume($this))->create($cashflow);
+        return $printingDocument;
+    }
+
+    public function ConfigDocument()
+    {
+        $printingDocument = (new Jobs\Config($this))->create();
         return $printingDocument;
     }
 

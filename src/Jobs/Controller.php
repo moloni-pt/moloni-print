@@ -130,7 +130,9 @@ class Controller
         $this->builder->textStyle();
         $this->builder->textDouble();
         $this->builder->textAlign();
-        $this->builder->cut();
+        if ($this->printer->hasCutter) {
+            $this->builder->cut();
+        }
     }
 
     /**

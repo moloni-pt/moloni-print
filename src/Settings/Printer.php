@@ -65,6 +65,12 @@ class Printer
     public $tableSplitChar = '─';
 
     /**
+     * App printing setting
+     * @var bool
+     */
+    public $continuousPrint = true;
+
+    /**
      * Printers constructor.
      * @param $printer array
      */
@@ -75,6 +81,19 @@ class Printer
 
     /**
      * @param array $printer
+     * normalWidth - Size of a normal char - default = 48
+     * condensedWidth - Size of of a condensed char - default = 64
+     * dotWidth - Max size of a image = default = 576
+     * hasDrawer - Prints a command to open the drawer
+     * hasCutter - Prints a command to cut paper
+     * printMode - Print images in one of the available modes
+     *  1 - Normal (default)
+     *  2 - Modo alternativo
+     *  3 - Baixa densidade
+     *  4 - Baixa densidade, modo alternativo
+     *  5 - Não imprimir imagens
+     * replaceAccentedChars - Replace Accented Chars
+     * tableSplitChar - Select the char used as a line split char
      */
     private function setPrinterSettings($printer)
     {
@@ -121,6 +140,10 @@ class Printer
 
             if (isset($printer['tableSplitChar'])) {
                 $this->tableSplitChar = $printer['tableSplitChar'];
+            }
+
+            if (isset($printer['continuousPrint'])) {
+                $this->continuousPrint = $printer['continuousPrint'];
             }
         }
     }

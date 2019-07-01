@@ -2,8 +2,6 @@
 
 namespace MoloniPrint\Jobs;
 
-use MoloniPrint\Utils\Tools;
-
 class Common extends Controller
 {
 

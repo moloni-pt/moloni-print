@@ -60,10 +60,10 @@ class Regular extends Cashflow
         $this->builder->textDouble(true, true);
         $this->builder->textStyle(false, false, true);
 
-        if ($this->cashflow['type_id'] == 4 || $this->cashflow['type_id'] == 3) {
-            $this->builder->text($this->getCashflowTypeString($this->cashflow['type_id']));
-        } else {
+        if ($this->cashflow['type_id'] == 4 || $this->cashflow['type_id'] == 1) {
             $this->builder->text($this->getCashflowTypeString());
+        } else {
+            $this->builder->text($this->getCashflowTypeString($this->cashflow['type_id']));
         }
 
         $this->linebreak();

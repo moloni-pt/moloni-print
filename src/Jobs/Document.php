@@ -8,6 +8,37 @@ use MoloniPrint\Utils\Tools;
 class Document extends Common
 {
 
+    protected $documentSchema = [
+        'image',
+        'header' => [
+            'companyName',
+            'companyAddress',
+            'companyContacts',
+            'companySocialCapital'
+        ],
+        'linebreak',
+        'documentDetails',
+        'linebreak',
+        'entity',
+        'linebreak',
+        'products',
+        'linebreak',
+        'taxes',
+        'linebreak',
+        'payments',
+        'relatedDocuments',
+        'notes',
+        'linebreak',
+        'productsCounter',
+        'productsWithQuantityCounter',
+        'linebreak',
+        'productsAvailabilityNote',
+        'linebreak',
+        'processedBy',
+        'poweredBy',
+        'linebreak',
+    ];
+
     protected $taxes = [];
     protected $exemptions = [];
     protected $deductions = [];
@@ -329,6 +360,12 @@ class Document extends Common
 
                 $documentName = $this->labels->document_types[$document['associated_document']['document_type_id']];
                 $table->addCell($documentName . ' ' . $document['associated_document']['document_set_name'] . '/' . $document['associated_document']['number'], ["condensed" => true]);
+
+                if ($this->printer->condensedWidth < 60) {
+                    $table->newRow();
+                    $table->addCell('');
+                }
+
                 $table->addCell($dateFormatted, ["condensed" => true, "alignment" => "RIGHT"]);
                 $table->addCell(Tools::priceFormat($document['associated_document']['net_value'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
                 $table->addCell(Tools::priceFormat($document['value'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
@@ -415,22 +452,24 @@ class Document extends Common
      ******************************************/
     public function drawProductsFull()
     {
-        $this->builder->textFont('C');
-        $this->builder->textDouble(true, true);
-        $this->builder->text($this->labels->products);
-        $this->linebreak();
+        if (is_array($this->products) && !empty($this->products)) {
+            $this->builder->textFont('C');
+            $this->builder->textDouble(true, true);
+            $this->builder->text($this->labels->products);
+            $this->linebreak();
 
-        $table = new Table($this->builder, $this->printer);
-        $this->drawProductsFullHeader($table);
+            $table = new Table($this->builder, $this->printer);
+            $this->drawProductsFullHeader($table);
 
-        $table->addLineSplit();
-        foreach ($this->products as $product) {
-            $this->drawProductsFullLine($table, $product);
+            $table->addLineSplit();
+            foreach ($this->products as $product) {
+                $this->drawProductsFullLine($table, $product);
+            }
+            $table->addLineSplit();
+
+            $table->drawTable();
+            $this->drawProductsFullResume();
         }
-        $table->addLineSplit();
-
-        $table->drawTable();
-        $this->drawProductsFullResume();
     }
 
     private function drawProductsFullHeader(Table &$table)

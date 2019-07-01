@@ -32,6 +32,7 @@ class Labels
     public $destination_place = "Local Descarga";
     public $discount_short = "Desc.";
     public $difference = "Diferença";
+    public $documents = "Documentos";
     public $document_created_at = "Documento gerado em";
     public $email = "Email";
     public $outflow = "Saídas";

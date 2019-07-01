@@ -7,7 +7,7 @@ use MoloniPrint\Jobs\Cashflow;
 use MoloniPrint\Table\Table;
 use MoloniPrint\Utils\Tools;
 
-class Resume extends Cashflow
+class Detailed extends Cashflow
 {
 
     public $drawingSchema = [
@@ -16,6 +16,10 @@ class Resume extends Cashflow
         'details',
         'linebreak',
         'resume',
+        'linebreak',
+        'movements',
+        'linebreak',
+        'documents',
         'linebreak',
         'sales',
         'linebreak',
@@ -31,9 +35,14 @@ class Resume extends Cashflow
     private $resume = [];
     private $incoming = [];
     private $outgoing = [];
+    private $movements = [];
+    private $documents = [];
 
     private $totalIncoming = 0;
     private $totalOutgoing = 0;
+
+    private $totalDocuments = 0;
+    private $totalMovements = 0;
 
     /**
      * Document constructor.
@@ -92,7 +101,7 @@ class Resume extends Cashflow
         $this->builder->textFont('C');
         $this->builder->textAlign('');
         $this->builder->textDouble(true, true);
-        $this->builder->textStyle(false, false, true);
+        $this->builder->textStyle();
         $this->builder->text($this->labels->resume);
         $this->linebreak();
 
@@ -119,14 +128,68 @@ class Resume extends Cashflow
         $this->linebreak();
     }
 
+    public function movements()
+    {
+        if (!empty($this->movements) && is_array($this->movements)) {
+            $this->builder->addTittle($this->labels->cashflow);
+            $this->linebreak();
+
+            $table = new Table($this->builder, $this->printer);
+            $table->addColumns([null, 20]);
+
+            $table->addLineSplit();
+
+            foreach ($this->movements as $movement) {
+                $table->addCell($movement['name'], ['condensed' => true, 'emphasized' => true]);
+                $table->addCell(Tools::priceFormat($movement['value'], $this->currency), ['alignment' => 'RIGHT', 'condensed' => true]);
+                $table->newRow();
+                $table->addCell(Tools::dateFormat($movement['date'], 'd-m-Y H:i:s'), ['condensed' => true]);
+                $table->newRow();
+            }
+
+            $table->addLineSplit();
+
+            $table->addCell($this->labels->total, ['condensed' => true, 'emphasized' => true]);
+            $table->addCell(Tools::priceFormat($this->totalMovements), ['condensed' => true, 'emphasized' => true, 'alignment' => 'RIGHT']);
+
+            $table->drawTable();
+            $this->linebreak();
+        }
+    }
+
+    public function documents()
+    {
+        if (!empty($this->documents) && is_array($this->documents)) {
+            $this->builder->addTittle($this->labels->documents);
+            $this->linebreak();
+
+            $table = new Table($this->builder, $this->printer);
+            $table->addColumns([null, 20]);
+
+            $table->addLineSplit();
+
+            foreach ($this->documents as $document) {
+                $table->addCell($document['name'], ['condensed' => true, 'emphasized' => true]);
+                $table->addCell(Tools::priceFormat($document['value'], $this->currency), ['alignment' => 'RIGHT', 'condensed' => true]);
+                $table->newRow();
+                $table->addCell(Tools::dateFormat($document['date'], 'd-m-Y H:i:s'), ['condensed' => true]);
+                $table->newRow();
+            }
+
+            $table->addLineSplit();
+
+            $table->addCell($this->labels->total, ['condensed' => true, 'emphasized' => true]);
+            $table->addCell(Tools::priceFormat($this->totalDocuments), ['condensed' => true, 'emphasized' => true, 'alignment' => 'RIGHT']);
+
+            $table->drawTable();
+            $this->linebreak();
+        }
+    }
+
     public function sales()
     {
         if (!empty($this->incoming) && is_array($this->incoming)) {
-            $this->builder->textFont('C');
-            $this->builder->textAlign('');
-            $this->builder->textDouble(true, true);
-            $this->builder->textStyle(false, false, true);
-            $this->builder->text($this->labels->sales);
+            $this->builder->addTittle($this->labels->sales);
             $this->linebreak();
 
             $table = new Table($this->builder, $this->printer);
@@ -152,11 +215,7 @@ class Resume extends Cashflow
     public function expenses()
     {
         if (!empty($this->outgoing) && is_array($this->outgoing)) {
-            $this->builder->textFont('C');
-            $this->builder->textAlign('');
-            $this->builder->textDouble(true, true);
-            $this->builder->textStyle(false, false, true);
-            $this->builder->text($this->labels->outflow . '/' . $this->labels->expenses);
+            $this->builder->addTittle($this->labels->outflow . '/' . $this->labels->expenses);
             $this->linebreak();
 
             $table = new Table($this->builder, $this->printer);
@@ -181,49 +240,75 @@ class Resume extends Cashflow
 
     private function parseMovements()
     {
-        if (isset($this->cashflow['associated_movements']) && is_array($this->cashflow['associated_movements'])) {
+        $this->movements[] = $this->parseMovement($this->cashflow);
+        if (!empty($this->cashflow['associated_movements']) && is_array($this->cashflow['associated_movements'])) {
             foreach ($this->cashflow['associated_movements'] as $movement) {
-                if ($movement['type_id'] == 2) {
-                    // For sales
-                    $this->totalIncoming += $movement['value'];
-                    $totalValue = $movement['value'];
-                    $totalAssociatedValue = 0;
 
-                    if (!empty($movement['payments']) && is_array($movement['payments'])) {
-                        foreach ($movement['payments'] as $payment) {
-                            $this->incoming[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
-                            $this->incoming[$payment['payment_method_id']]['value'] += $payment['value'];
-                            $totalAssociatedValue += $payment['value'];
-                        }
-                    }
+                $parseForDirectionTotal = $movement['type_id'] == 2 ? 'totalIncoming' : 'totalOutgoing';
+                $parseForDirection = $movement['type_id'] == 2 ? 'incoming' : 'outgoing';
 
-                    if ($totalValue > $totalAssociatedValue) {
-                        $this->incoming[0]['name'] = $this->labels->undifferentiated;
-                        $this->incoming[0]['value'] += $totalValue - $totalAssociatedValue;
-                    }
-
+                if ($movement['document_id'] > 0 && !empty($movement['document'])) {
+                    $this->documents[] = $this->parseDocument($movement);
                 } else {
-                    // For expenses
-                    $this->totalOutgoing += $movement['value'];
-                    $totalValue = $movement['value'];
-                    $totalAssociatedValue = 0;
+                    $this->movements[] = $this->parseMovement($movement);
+                }
 
-                    if (isset($movement['payments']) && is_array($movement['payments'])) {
-                        foreach ($movement['payments'] as $payment) {
-                            $this->outgoing[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
-                            $this->outgoing[$payment['payment_method_id']]['value'] += $payment['value'];
+                $this->{$parseForDirectionTotal} += $movement['value'];
+                $totalValue = $movement['value'];
+                $totalAssociatedValue = 0;
 
-                            $totalAssociatedValue += $payment['value'];
-                        }
-                    }
+                if (isset($movement['payments']) && is_array($movement['payments'])) {
+                    foreach ($movement['payments'] as $payment) {
+                        $this->{$parseForDirection}[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
+                        $this->{$parseForDirection}[$payment['payment_method_id']]['value'] += $payment['value'];
 
-                    if ($totalValue > $totalAssociatedValue) {
-                        $this->outgoing[0]['name'] = $this->labels->undifferentiated;
-                        $this->outgoing[0]['value'] += $totalValue - $totalAssociatedValue;
+                        $totalAssociatedValue += $payment['value'];
                     }
                 }
+
+                if ($totalValue > $totalAssociatedValue) {
+                    $this->{$parseForDirection}[0]['name'] = $this->labels->undifferentiated;
+                    $this->{$parseForDirection}[0]['value'] += $totalValue - $totalAssociatedValue;
+                }
+
             }
         }
+    }
+
+    private function parseDocument($movement)
+    {
+        $document = [];
+        $document['name'] =
+            $this->labels->document_types[$movement['document']['document_type_id']] . ' ' .
+            $movement['document']['document_set_name'] . "/" .
+            $movement['document']['number'];
+        $document['date'] = $movement['date'];
+        $document['value'] = $movement['value'];
+
+        if ($movement['type_id'] == 1 || $movement['type_id'] == 2) {
+            $this->totalDocuments += $movement['value'];
+        } else if ($movement['type_id'] == 3) {
+            $this->totalDocuments -= $movement['value'];
+        }
+
+        return $document;
+    }
+
+    private function parseMovement($movement)
+    {
+        $document = [];
+
+        $document['name'] = $this->getCashflowTypeString($movement['type_id']);
+        $document['date'] = $movement['date'];
+        $document['value'] = $movement['value'];
+
+        if ($movement['type_id'] == 1 || $movement['type_id'] == 2) {
+            $this->totalMovements += $movement['value'];
+        } else if ($movement['type_id'] == 3) {
+            $this->totalMovements -= $movement['value'];
+        }
+
+        return $document;
     }
 
     private function parsePayments()

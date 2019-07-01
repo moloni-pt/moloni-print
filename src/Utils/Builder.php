@@ -80,6 +80,7 @@ class Builder
                 'imagePrintMode' => $printer->imagePrintMode,
                 'alternativeCharset' => $printer->alternativeCharset,
                 'replaceAccentedChars' => $printer->replaceAccentedChars,
+                'continuousPrint' => $printer->continuousPrint,
             ]
         ];
     }
@@ -87,7 +88,9 @@ class Builder
     public function image($url, $maxWidth = 576)
     {
         try {
+            $maxPaperWidth = $maxWidth;
             $image = new \Imagick($url);
+
             $image->setImageFormat("png");
 
             $imageWidth = $maxWidth;
@@ -97,9 +100,11 @@ class Builder
                 $newImageHeight = ceil($imageWidth / 3);
                 $imageWidth = floor($imageWidth * ($newImageHeight / $imageHeight));
                 $imageHeight = $newImageHeight;
+                $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
+                $image->extentImage($maxPaperWidth, $imageHeight, 0, 0);
+            } else {
+                $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
             }
-
-            $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
 
             $base64 = base64_encode($image->getimageblob());
 

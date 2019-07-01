@@ -71,6 +71,12 @@ class Job
         return $printingDocument;
     }
 
+    public function CashflowDetailed(Array $cashflow)
+    {
+        $printingDocument = (new Jobs\Cashflows\Detailed($this))->create($cashflow);
+        return $printingDocument;
+    }
+
     public function ConfigDocument()
     {
         $printingDocument = (new Jobs\Config($this))->create();

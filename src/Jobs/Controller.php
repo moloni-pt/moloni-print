@@ -22,37 +22,6 @@ class Controller
     protected $printer;
     protected $builder;
 
-    protected $documentSchema = [
-        'image',
-        'header' => [
-            'companyName',
-            'companyAddress',
-            'companyContacts',
-            'companySocialCapital'
-        ],
-        'linebreak',
-        'documentDetails',
-        'linebreak',
-        'entity',
-        'linebreak',
-        'products',
-        'linebreak',
-        'taxes',
-        'linebreak',
-        'payments',
-        'relatedDocuments',
-        'linebreak',
-        'notes',
-        'linebreak',
-        'productsCounter',
-        'productsWithQuantityCounter',
-        'linebreak',
-        'productsAvailabilityNote',
-        'linebreak',
-        'processedBy',
-        'poweredBy'
-    ];
-
     protected $offerTicketSchema = [
         'image',
         'header',
@@ -64,7 +33,8 @@ class Controller
         'notes',
         'linebreak',
         'processedBy',
-        'poweredBy'
+        'poweredBy',
+        'linebreak',
     ];
 
     protected $cashflowRegularSchema = [
@@ -78,7 +48,8 @@ class Controller
         'createdAt',
         'linebreak',
         'processedBy',
-        'poweredBy'
+        'poweredBy',
+        'linebreak',
     ];
 
     protected $cashflowClosingSchema = [
@@ -97,7 +68,8 @@ class Controller
         'createdAt',
         'linebreak',
         'processedBy',
-        'poweredBy'
+        'poweredBy',
+        'linebreak',
     ];
 
     /**

@@ -65,10 +65,30 @@ class Printer
     public $tableSplitChar = '─';
 
     /**
+     * Pause the printer in the middle of printing copies
+     * @deprecated Since 2019-08-06
+     * The result should be only one document
+     * @var bool
+     */
+    public $usePause = false;
+
+    /**
      * App printing setting
      * @var bool
      */
     public $continuousPrint = true;
+
+    /**
+     * @var string Type of image
+     * default - base64 image
+     * path - path to the image
+     */
+    public $imageType = 'default';
+
+    /**
+     * @var int Number of copies
+     */
+    public $copies = 1;
 
     /**
      * Printers constructor.
@@ -134,6 +154,11 @@ class Printer
             if (isset($printer['replaceAccentedChars'])) {
                 $this->replaceAccentedChars = ($printer['replaceAccentedChars'] || $printer['replaceAccentedChars'] == 'true' ? true : false);
             }
+
+            if (isset($printer['usePause'])) {
+                $this->usePause = ($printer['usePause'] || $printer['usePause'] == 'true' ? true : false);
+            }
+
             if (isset($printer['alternativeCharset'])) {
                 $this->alternativeCharset = ($printer['alternativeCharset'] || $printer['alternativeCharset'] == 'true' ? true : false);
             }
@@ -143,7 +168,11 @@ class Printer
             }
 
             if (isset($printer['continuousPrint'])) {
-                $this->continuousPrint = $printer['continuousPrint'];
+                $this->continuousPrint = $printer['continuousPrint'] ? true : false;
+            }
+
+            if (isset($printer['imageType'])) {
+                $this->imageType = in_array($printer['imageType'], ['base64', 'default', 'path']) ? $printer['imageType'] : 'default';
             }
         }
     }

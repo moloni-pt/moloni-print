@@ -5,6 +5,10 @@ namespace MoloniPrint\Utils;
 
 class Tools
 {
+    public static $exchangeRate = 1;
+    public static $currency = '€';
+    public static $symbolRight = 1;
+
     public static function dateFormat($dateInput, $format = 'd-m-Y H:i')
     {
         try {
@@ -82,16 +86,24 @@ class Tools
     /**
      * Formats a float value into a price string (can also be used to format percentage values)
      * @param float $price
-     * @param string $currencySymbol
+     * @param string|false $currencySymbol
      * @param int $decimals
      * @param string $decimalSeparator
      * @param string $thousandsSeparator
-     * @param bool $currencyRight
-     * The currency symbol will be put on the right or left of the value
+     * @param bool $currencyRight The currency symbol will be put on the right or left of the value
+     * @param bool|float $exchangeRate
      * @return string
      */
-    public static function priceFormat($price, $currencySymbol = '€', $decimals = 2, $decimalSeparator = '.', $thousandsSeparator = ' ', $currencyRight = true)
+    public static function priceFormat($price, $currencySymbol = false, $decimals = 2, $decimalSeparator = ',', $thousandsSeparator = '.', $currencyRight = true, $exchangeRate = false)
     {
+
+        if (!$currencySymbol) {
+            $currencySymbol = self::$currency;
+        }
+
+        $exchangeRate = $exchangeRate ? $exchangeRate : self::$exchangeRate;
+        $currencySymbolRight = ($currencyRight && self::$symbolRight);
+
         $price = preg_replace("/[^\d\-.,]/", '', $price);
         $priceWithoutCommas = preg_replace("/[^\d\-]/", ".", $price);
         $priceSplit = explode('.', $priceWithoutCommas);
@@ -107,8 +119,18 @@ class Tools
             return '';
         }
 
+
+        if ($currencySymbol === '%') {
+            $exchangeRate = 1;
+            $currencySymbolRight = 1;
+        }
+
+        if ($exchangeRate !== (float)1) {
+            $price = $price * $exchangeRate;
+        }
+
         $formatted = number_format($price, $decimals, $decimalSeparator, $thousandsSeparator);
-        if ($currencyRight) {
+        if ($currencySymbolRight) {
             $formatted = $formatted . $currencySymbol;
         } else {
             $formatted = $currencySymbol . $formatted;

@@ -30,8 +30,11 @@ class Common extends Controller
      */
     public function image()
     {
-        if (!empty($this->company['image'])) {
-            $this->builder->image($this->imageUrl . '?macro=imgWebPOSCompanyLogoPrinterRaw&img=' . $this->company['image'], $this->printer->dotWidth);
+        if (!empty($this->document['document_set']['template']['image'])) {
+            $this->builder->image($this->document['document_set']['template']['image'], $this->printer->dotWidth, $this->printer->imageType);
+            $this->linebreak();
+        } elseif (!empty($this->company['image'])) {
+            $this->builder->image($this->company['image'], $this->printer->dotWidth, $this->printer->imageType);
             $this->linebreak();
         }
     }
@@ -52,8 +55,18 @@ class Common extends Controller
      */
     public function companyName()
     {
+        $this->builder->textFont();
+        $this->builder->textAlign();
+        $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
-        $this->builder->text($this->company['name'] . "\n");
+        if (isset($this->document['document_set']['template']['business_name'])) {
+            $this->builder->text($this->document['document_set']['template']['business_name'] . "\n");
+            $this->builder->textFont('C');
+            $this->builder->textStyle();
+            $this->builder->text($this->labels->company . ': ' . $this->company['name'] . "\n");
+        } else {
+            $this->builder->text($this->company['name'] . "\n");
+        }
     }
 
     /**
@@ -65,8 +78,16 @@ class Common extends Controller
         $this->builder->textFont('C');
 
         $this->builder->text($this->labels->vat . ': ' . $this->company['vat'] . "\n");
-        $this->builder->text($this->company['address'] . "\n");
-        $this->builder->text($this->company['zip_code'] . ' ' . $this->company['city'] . ', ' . $this->company['country']['name'] . "\n");
+        if (isset($this->document['document_set']['template']) && !empty($this->document['document_set']['template'])) {
+            $this->builder->text($this->document['document_set']['template']['address'] . "\n");
+
+            $this->builder->text($this->document['document_set']['template']['zip_code'] . ' ');
+            $this->builder->text($this->document['document_set']['template']['city'] . ', ');
+            $this->builder->text($this->document['document_set']['template']['country']['name'] . "\n");
+        } else {
+            $this->builder->text($this->company['address'] . "\n");
+            $this->builder->text($this->company['zip_code'] . ' ' . $this->company['city'] . ', ' . $this->company['country']['name'] . "\n");
+        }
     }
 
     /**
@@ -77,14 +98,22 @@ class Common extends Controller
         $this->builder->textStyle(false, false, false);
         $this->builder->textFont('C');
 
-        if (!empty($this->company['email']) || !empty($this->company['phone'])) {
-            if (!empty($this->company['email'])) {
-                $this->builder->text($this->labels->email . ': ' . $this->company['email']);
-                if (!empty($this->company['phone'])) {
-                    $this->builder->text(", " . $this->labels->phone . ': ' . $this->company['phone']);
+        if (isset($this->document['document_set']['template'])) {
+            $email = $this->document['document_set']['template']['email'];
+            $phone = $this->document['document_set']['template']['phone'];
+        } else {
+            $email = $this->company['email'];
+            $phone = $this->company['phone'];
+        }
+
+        if (!empty($email) || !empty($phone)) {
+            if (!empty($email)) {
+                $this->builder->text($this->labels->email . ': ' . $email);
+                if (!empty($phone)) {
+                    $this->builder->text(", " . $this->labels->phone . ': ' . $phone);
                 }
             } else {
-                $this->builder->text($this->labels->phone . ': ' . $this->company['phone']);
+                $this->builder->text($this->labels->phone . ': ' . $phone);
             }
         }
 

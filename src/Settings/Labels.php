@@ -22,6 +22,7 @@ class Labels
     public $cashflow_out = "Saída de caixa";
     public $cashflow_resume = "Consulta de caixa";
     public $cashflow_starting_amount = "Fundo de caixa";
+    public $coin = "Moeda";
     public $commercial_registration_number = "R.C.C. Nº";
     public $company = "Empresa";
     public $conciliated = "Valor Conciliado";
@@ -34,7 +35,10 @@ class Labels
     public $difference = "Diferença";
     public $documents = "Documentos";
     public $document_created_at = "Documento gerado em";
+    public $duplicate = "Duplicado";
     public $email = "Email";
+    public $entity = "Entidade";
+    public $exchange_rate = "Câmbio";
     public $outflow = "Saídas";
     public $expedition_method = "Método de Expedição";
     public $expenses = "Despesas";
@@ -62,12 +66,15 @@ class Labels
     public $products_qty_short = "Qtd. artigos";
     public $pvp_unit_short = "PVP Unit.";
     public $qty = "Qtd.";
+    public $quadruplicate = "Quadruplicado";
+    public $mb_references = "Referencias Multibanco";
     public $reference_short = "Refª";
     public $resume = "Resumo";
     public $sales = "Vendas";
     public $salesman = "Vendedor";
     public $second_way = "2ª Via";
     public $shipping = "Transporte";
+    public $shippingMethod = "Método de Expedição";
     public $signature = "Assinatura";
     public $social_capital = "Capital Social";
     public $taxes = "Taxas";
@@ -76,6 +83,7 @@ class Labels
     public $total_discounts = "Valor do Desconto";
     public $total_expenses = "Total despesas";
     public $total_sales = "Total vendas";
+    public $triplicate = "Triplicado";
     public $undifferentiated = "Indiferenciado";
     public $value = "Valor";
     public $vehicle = "Viatura";
@@ -144,7 +152,6 @@ class Labels
         'M20' => 'IVA - Regime forfetário',
         'M99' => 'Não sujeito; não tributado (Ou similar)',
     ];
-
 
     /**
      * Labels constructor.

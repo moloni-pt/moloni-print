@@ -7,6 +7,10 @@ use MoloniPrint\Settings\Printer;
 class Builder
 {
 
+    protected $imageUrl = "https://moloni.pt/_imagens/";
+
+    private $store = [];
+
     /**
      * Text alignment
      * @var array
@@ -67,7 +71,7 @@ class Builder
      */
     public function addSettings(Printer $printer)
     {
-        $this->printJob[] = [
+        $settings = [
             'op' => 'settings',
             'data' => [
                 'normalLineWidth' => $printer->normalWidth,
@@ -81,39 +85,61 @@ class Builder
                 'alternativeCharset' => $printer->alternativeCharset,
                 'replaceAccentedChars' => $printer->replaceAccentedChars,
                 'continuousPrint' => $printer->continuousPrint,
+                'copies' => $printer->copies
             ]
         ];
+
+        array_unshift($this->printJob, $settings);
     }
 
-    public function image($url, $maxWidth = 576)
+    public function image($path, $maxWidth = 576, $imageType = 'default')
     {
-        try {
-            $maxPaperWidth = $maxWidth;
-            $image = new \Imagick($url);
 
-            $image->setImageFormat("png");
+        switch ($imageType) {
+            case 'path':
+                $this->printJob[] = [
+                    'op' => 'image',
+                    'data' => $path
+                ];
+                break;
+            case 'default':
+            case 'base64':
+            default:
+                try {
+                    if (isset($this->store[$path . $maxWidth])) {
+                        $base64 = $this->store[$path . $maxWidth];
+                    } else {
+                        $maxPaperWidth = $maxWidth;
+                        $url = $this->imageUrl . '?macro=imgWebPOSCompanyLogoPrinterRaw&img=' . $path;
+                        $image = new \Imagick($url);
 
-            $imageWidth = $maxWidth;
-            $imageHeight = ceil($maxWidth * $image->getImageHeight() / $image->getImageWidth());
+                        $image->setImageFormat("png");
 
-            if ($imageHeight > ($imageWidth / 3)) {
-                $newImageHeight = ceil($imageWidth / 3);
-                $imageWidth = floor($imageWidth * ($newImageHeight / $imageHeight));
-                $imageHeight = $newImageHeight;
-                $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
-                $image->extentImage($maxPaperWidth, $imageHeight, 0, 0);
-            } else {
-                $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
-            }
+                        $imageWidth = $maxWidth;
+                        $imageHeight = ceil($maxWidth * $image->getImageHeight() / $image->getImageWidth());
 
-            $base64 = base64_encode($image->getimageblob());
+                        if ($imageHeight > ($imageWidth / 3)) {
+                            $newImageHeight = ceil($imageWidth / 3);
+                            $imageWidth = floor($imageWidth * ($newImageHeight / $imageHeight));
+                            $imageHeight = $newImageHeight;
+                            $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
+                            $image->extentImage($maxPaperWidth, $imageHeight, 0, 0);
+                        } else {
+                            $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
+                        }
 
-            $this->printJob[] = [
-                'op' => 'image',
-                'data' => 'data:image/png;base64,' . $base64
-            ];
-        } catch (\Exception $exception) {
+                        $base64 = base64_encode($image->getimageblob());
+                        $this->store[$url . $maxWidth] = $base64;
+                    }
 
+                    $this->printJob[] = [
+                        'op' => 'image',
+                        'data' => 'data:image/png;base64,' . $base64
+                    ];
+                } catch (\Exception $exception) {
+
+                }
+                break;
         }
     }
 
@@ -131,6 +157,14 @@ class Builder
         $this->textStyle();
         $this->textDouble(true, true);
         $this->text($text);
+    }
+
+    public function resetStyle()
+    {
+        $this->textFont();
+        $this->textAlign();
+        $this->textDouble();
+        $this->textStyle();
     }
 
     /**
@@ -228,6 +262,14 @@ class Builder
         $this->printJob[] = [
             'op' => 'cut',
             'data' => 'feed'
+        ];
+    }
+
+    public function pause()
+    {
+        $this->printJob[] = [
+            'op' => 'pause',
+            'data' => 'pause'
         ];
     }
 

@@ -20,15 +20,13 @@ class Document extends Common
         'documentDetails',
         'linebreak',
         'entity',
-        'linebreak',
         'products',
-        'linebreak',
         'taxes',
-        'linebreak',
+        'mbReferences',
         'payments',
         'relatedDocuments',
+        'shippingDetails',
         'notes',
-        'linebreak',
         'productsCounter',
         'productsWithQuantityCounter',
         'linebreak',
@@ -46,6 +44,13 @@ class Document extends Common
     protected $productsCount = 0;
     protected $productsWithQuantityCount = 0;
     protected $productsToPrint = [];
+
+    protected $currentCopy = 1;
+
+    /**
+     * @var float
+     */
+    protected $exchangeRate = 1;
 
     /**
      * Document constructor.
@@ -65,8 +70,21 @@ class Document extends Common
     {
         $this->document = $document;
 
+        $this->currency = isset($this->document['exchange_currency']['symbol']) ?
+            $this->document['exchange_currency']['symbol'] :
+            $this->company['currency']['symbol'];
+
+        if (isset($this->document['exchange_rate']) && !empty((float)$this->document['exchange_rate'])) {
+            Tools::$currency = $this->currency;
+            Tools::$exchangeRate = $this->document['exchange_rate'];
+            Tools::$symbolRight = $this->document['exchange_currency']['symbol_right'];
+        }
+
+
         $this->parseEntities();
         $this->parseProducts();
+
+        $this->parseCopies();
 
         $this->drawFromScheme($this->documentSchema);
         $this->finish();
@@ -99,11 +117,30 @@ class Document extends Common
         $this->builder->textStyle(false, false, false);
         $this->builder->textFont('C');
 
-        if (isset($this->document['second_way']) && $this->document['second_way']) {
-            $this->builder->text($this->labels->second_way);
-        } else {
-            $this->builder->text($this->labels->original);
+        /* if (isset($this->document['second_way']) && $this->document['second_way']) {
+          $this->builder->text($this->labels->second_way);
+          } else {
+          $this->builder->text($this->labels->original);
+          }
+         */
+
+        switch ($this->currentCopy) {
+            case 1:
+                $this->builder->text($this->labels->original);
+                break;
+            case 2:
+                $this->builder->text($this->labels->duplicate);
+                break;
+
+            case 3:
+                $this->builder->text($this->labels->triplicate);
+                break;
+
+            case 4:
+                $this->builder->text($this->labels->quadruplicate);
+                break;
         }
+
         $this->linebreak();
 
         $this->builder->textStyle(false, false, true);
@@ -123,13 +160,20 @@ class Document extends Common
     public function documentTerminal()
     {
         $this->builder->textStyle(false, false, false);
-        $this->builder->text($this->labels->terminal . ': ' . $this->terminal['name']);
-        $this->linebreak();
+        if (isset($this->terminal['name'])) {
+            $this->builder->text($this->labels->terminal . ': ' . $this->terminal['name']);
+            $this->linebreak();
+        }
         $this->builder->text($this->labels->operator . ': ' . $this->document['lastmodifiedby']);
         $this->linebreak();
 
         if (isset($this->document['salesman_id']) && $this->document['salesman_id'] > 0) {
             $this->builder->text($this->labels->salesman . ': ' . $this->document['salesman']['name']);
+            $this->linebreak();
+        }
+
+        if (isset($this->document['exchange_currency']['iso4217'])) {
+            $this->builder->text($this->labels->coin . ': ' . $this->document['exchange_currency']['iso4217']);
             $this->linebreak();
         }
     }
@@ -280,11 +324,12 @@ class Document extends Common
     public function taxes()
     {
         if (!empty($this->taxes) || !empty($this->exemptions)) {
+            $this->linebreak();
             $this->builder->addTittle($this->labels->taxes);
             $this->linebreak();
 
             $table = new Table($this->builder, $this->printer);
-            $table->addColumns([null, 7, 10, 10]);
+            $table->addColumns([null, 7, 12, 10]);
 
             $headerStyle = ["emphasized" => true, "condensed" => true, "alignment" => "RIGHT"];
             $table->addCells(['', $this->labels->value, $this->labels->incidence, $this->labels->total], $headerStyle);
@@ -310,9 +355,40 @@ class Document extends Common
         }
     }
 
+    public function mbReferences()
+    {
+        if (!empty($this->document['mb_references'])) {
+            $this->linebreak();
+            $this->builder->addTittle($this->labels->mb_references);
+            $this->linebreak();
+            $table = new Table($this->builder, $this->printer);
+            $table->addColumns([null, 14, 15]);
+
+            $table->addCell($this->labels->entity, ["emphasized" => true, "condensed" => true]);
+            $table->addCell($this->labels->reference_short, ["emphasized" => true, "condensed" => true]);
+            $table->addCell($this->labels->value, ["emphasized" => true, "condensed" => true, "alignment" => "RIGHT"]);
+            $table->addLineSplit();
+
+            foreach ($this->document['mb_references'] as $reference) {
+                $table->newRow();
+
+                $fullReference = str_pad($reference['sub_entity'], 3, "0", STR_PAD_LEFT);
+                $fullReference .= str_pad($reference['reference'], 4, "0", STR_PAD_LEFT);
+                $fullReference .= str_pad($reference['check_digits'], 2, "0", STR_PAD_LEFT);
+                $fullReference = chunk_split($fullReference, 3, ' ');
+                $table->addCells([$reference['entity'], $fullReference], ["condensed" => true]);
+                $table->addCell(Tools::priceFormat($reference['value']), ["condensed" => true, "alignment" => "RIGHT"]);
+            }
+
+            $table->drawTable();
+            $this->linebreak();
+        }
+    }
+
     public function payments()
     {
         if (!empty($this->document['payments'])) {
+            $this->linebreak();
             $this->builder->addTittle($this->labels->payments);
             $this->linebreak();
 
@@ -340,6 +416,7 @@ class Document extends Common
     public function relatedDocuments()
     {
         if (!empty($this->document['associated_documents'])) {
+            $this->linebreak();
             $this->builder->addTittle($this->labels->associated_documents);
             $this->linebreak();
 
@@ -372,6 +449,87 @@ class Document extends Common
             }
 
             $table->drawTable();
+            $this->linebreak();
+        }
+    }
+
+    public function shippingDetails()
+    {
+        if (!empty($this->document['delivery_datetime']) ||
+            !empty($this->document['delivery_method_name']) ||
+            !empty($this->document['delivery_departure_address']) ||
+            !empty($this->document['delivery_departure_city']) ||
+            !empty($this->document['delivery_departure_zip_code']) ||
+            !empty($this->document['delivery_departure_country']) ||
+            !empty($this->document['delivery_destination_address']) ||
+            !empty($this->document['delivery_destination_city']) ||
+            !empty($this->document['delivery_destination_zip_code']) ||
+            !empty($this->document['delivery_destination_country']) ||
+            !empty($this->document['vehicle_name']) ||
+            !empty($this->document['vehicle_number_plate'])
+        ) {
+            $this->linebreak();
+            $this->builder->addTittle($this->labels->shipping);
+            $this->linebreak();
+
+            $this->builder->resetStyle();
+            $this->builder->textFont('C');
+
+            if (!empty($this->document['delivery_method_name'])) {
+                $this->linebreak();
+                $this->builder->textStyle(false, false, true);
+                $this->builder->text($this->labels->shippingMethod . ": ");
+                $this->builder->textStyle(false, false, false);
+                $this->builder->text($this->document['delivery_method_name']);
+            }
+
+            if (!empty($this->document['delivery_datetime'])) {
+                $this->linebreak();
+                $this->builder->textStyle(false, false, true);
+                $this->builder->text($this->labels->beginning . ": ");
+                $this->builder->textStyle(false, false, false);
+                $this->builder->text(Tools::dateFormat($this->document['delivery_datetime']));
+            }
+
+            if (!empty($this->document['delivery_departure_address']) ||
+                !empty($this->document['delivery_departure_city']) ||
+                !empty($this->document['delivery_departure_zip_code']) ||
+                !empty($this->document['delivery_departure_country_details']['name'])) {
+                $this->linebreak();
+                $this->builder->textStyle(false, false, true);
+                $this->builder->text($this->labels->departure_place . ":");
+                $this->builder->textStyle(false, false, false);
+                $this->builder->text(' ' . $this->document['delivery_departure_address']);
+                $this->builder->text(', ' . $this->document['delivery_departure_zip_code']);
+                $this->builder->text(' ' . $this->document['delivery_departure_city']);
+                $this->builder->text(', ' . $this->document['delivery_departure_country_details']['name']);
+            }
+
+            if (!empty($this->document['delivery_destination_address']) ||
+                !empty($this->document['delivery_destination_city']) ||
+                !empty($this->document['delivery_destination_zip_code']) ||
+                !empty($this->document['delivery_destination_country'])) {
+                $this->linebreak();
+                $this->builder->textStyle(false, false, true);
+                $this->builder->text($this->labels->destination_place . ":");
+                $this->builder->textStyle(false, false, false);
+                $this->builder->text(' ' . $this->document['delivery_destination_address']);
+                $this->builder->text(', ' . $this->document['delivery_destination_zip_code']);
+                $this->builder->text(' ' . $this->document['delivery_destination_city']);
+                $this->builder->text(', ' . $this->document['delivery_destination_country_details']['name']);
+            }
+
+            if (!empty($this->document['vehicle_name'])) {
+                $this->linebreak();
+                $this->builder->textStyle(false, false, true);
+                $this->builder->text($this->labels->vehicle . ":");
+                $this->builder->textStyle(false, false, false);
+                $this->builder->text(' ' . $this->document['vehicle_name']);
+                if (!empty($this->document['vehicle_name'])) {
+                    $this->builder->text(' (' . $this->document['vehicle_number_plate'] . ')');
+                }
+            }
+
             $this->linebreak();
         }
     }
@@ -420,17 +578,20 @@ class Document extends Common
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
         $this->builder->textAlign('CENTER');
-        $hash = $this->document['rsa_hash'][0];
-        $hash .= $this->document['rsa_hash'][10];
-        $hash .= $this->document['rsa_hash'][20];
-        $hash .= $this->document['rsa_hash'][30];
-        $this->builder->text($hash . ' - ');
+        if (!empty($this->document['rsa_hash'])) {
+            $hash = $this->document['rsa_hash'][0];
+            $hash .= $this->document['rsa_hash'][10];
+            $hash .= $this->document['rsa_hash'][20];
+            $hash .= $this->document['rsa_hash'][30];
+            $this->builder->text($hash . ' - ');
+        }
         $this->builder->text($this->labels->processed_by);
         $this->linebreak();
     }
 
     public function notes()
     {
+        $this->linebreak();
         // Credit notes require a customer signature
         if ($this->document['document_type']['saft_code'] == 'NC') {
             $this->signature();
@@ -443,6 +604,7 @@ class Document extends Common
             $this->builder->textStyle();
 
             $this->builder->text($this->document['notes']);
+            $this->linebreak();
         }
     }
 
@@ -453,6 +615,7 @@ class Document extends Common
     public function drawProductsFull()
     {
         if (is_array($this->products) && !empty($this->products)) {
+            $this->linebreak();
             $this->builder->textFont('C');
             $this->builder->textDouble(true, true);
             $this->builder->text($this->labels->products);
@@ -521,21 +684,32 @@ class Document extends Common
 
         $table->addCell('');
         $table->addCell($product['quantity'], $bodyStyle);
-        $table->addCell($product['unitPrice'], $bodyStyle);
+
+        if ($this->company['docs_show_unit_price_with_taxes'] == 1) {
+            $table->addCell($product['unitPriceWithTaxes'], $bodyStyle);
+        } else {
+            $table->addCell($product['unitPrice'], $bodyStyle);
+        }
 
         if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
             $table->addCell($product['discount'], $bodyStyle);
         }
 
         $table->addCell($product['tax'], $bodyStyle);
-        $table->addCell($product['totalPriceWithTaxes'], $bodyStyle);
+
+        if ($this->company['docs_show_values_with_taxes'] == 1) {
+            $table->addCell($product['totalPriceWithTaxes'], $bodyStyle);
+        } else {
+            $table->addCell($product['totalPrice'], $bodyStyle);
+        }
+
     }
 
     private function drawProductsFullResume()
     {
         $table = new Table($this->builder, $this->printer);
         $table->addColumn();
-        $table->addColumn(12);
+        $table->addColumn(20);
         $table->addCell($this->labels->gross_total, ["alignment" => "RIGHT"]);
         $table->addCell(Tools::priceFormat($this->document['gross_value']), ["alignment" => "RIGHT"]);
 
@@ -560,13 +734,47 @@ class Document extends Common
 
         $table->addCell($this->labels->total, ["alignment" => "RIGHT", 'emphasized' => true]);
         $table->addCell(Tools::priceFormat($this->document['net_value']), ["alignment" => "RIGHT", 'emphasized' => true]);
+
+        if (isset($this->document['exchange_currency']) && !empty(isset($this->document['exchange_currency']))) {
+            $this->drawProductsResumeExchangeRates($table);
+        }
+
         $table->drawTable();
         $this->linebreak();
     }
 
+    /**
+     * @param Table $table
+     */
+    private function drawProductsResumeExchangeRates(Table $table)
+    {
+        $table->addCells([' ', ' ']);
+        $table->addCell($this->labels->total . ' ' . $this->company['currency']['iso4217'], ["alignment" => "RIGHT", 'condensed' => true]);
+        $table->addCell(Tools::priceFormat(
+            $this->document['net_value'],
+            $this->company['currency']['symbol'],
+            2,
+            ',',
+            '.',
+            $this->company['currency']['symbol_right'],
+            1
+        ), ["alignment" => "RIGHT", 'condensed' => true]);
+
+        $table->addCell($this->labels->exchange_rate, ["alignment" => "RIGHT", 'condensed' => true]);
+        $exchangeRateString = Tools::priceFormat(
+                1,
+                $this->company['currency']['symbol'],
+                2,
+                ',',
+                '.',
+                $this->company['currency']['symbol_right'],
+                1
+            ) . "=" . Tools::priceFormat(1);
+        $table->addCell($exchangeRateString, ["alignment" => "RIGHT", 'condensed' => true]);
+    }
+
     protected function parseEntities()
     {
-        $this->currency = $this->company['currency']['symbol'];
         if ($this->company['country_id'] == 1 &&
             trim($this->document['entity_vat']) == '999999990' &&
             trim($this->document['entity_name']) == 'Consumidor Final') {
@@ -627,7 +835,7 @@ class Document extends Common
                     $this->taxes[$tax['name']]['total'] += $tax['total_value'];
                     $product['unitPriceWithTaxes'] += $tax['total_value'] / $raw['qty'];
                     $product['totalPriceWithTaxes'] += $tax['total_value'];
-                    $product['tax'] = $tax['value'] . ($tax['type'] == 1 ? '%' : $this->company['currency']['symbol']);
+                    $product['tax'] = $tax['value'] . ($tax['type'] == 1 ? '%' : $this->currency);
                 }
             } else {
                 if (!empty($raw['exemption_reason'])) {
@@ -653,6 +861,43 @@ class Document extends Common
             $this->productsCount++;
             $this->productsWithQuantityCount += $product['quantity'];
         }
+    }
+
+    protected function parseCopies()
+    {
+        $copies = 0;
+
+
+        if ($this->terminal['document_settings'] && !empty($this->terminal['document_settings'])) {
+            foreach ($this->terminal['document_settings'] as $documentSetting) {
+                if ($documentSetting['document_type_id'] == $this->document['document_type_id']) {
+                    if ((int)$documentSetting['num_copies'] > 0) {
+                        $copies = $documentSetting['num_copies'];
+                    }
+                }
+            }
+        }
+
+        if ($copies == 0 && isset($this->document['num_copies']) && (int)$this->document['num_copies'] > 0) {
+            $copies = (int)$this->document['num_copies'];
+        }
+
+
+        if ($copies == 0 && !empty($this->company['copies']) && is_array($this->company['copies'])) {
+            foreach ($this->company['copies'] as $companyCopies) {
+                if ($companyCopies['document_type_id'] == $this->document['document_type_id']) {
+                    if ((int)$companyCopies['copies'] > 0) {
+                        $copies = $companyCopies['copies'];
+                    }
+                }
+            }
+        }
+
+        if ($copies == 0) {
+            $copies = 1;
+        }
+
+        $this->printer->copies = $copies;
     }
 
 }

@@ -16,10 +16,25 @@ class Controller
     protected $lastLog = [];
     protected $logToSend = [];
 
+    /**
+     * @var array
+     */
     protected $company;
+    /**
+     * @var array
+     */
     protected $terminal;
+    /**
+     * @var \MoloniPrint\Settings\Labels
+     */
     protected $labels;
+    /**
+     * @var \MoloniPrint\Settings\Printer
+     */
     protected $printer;
+    /**
+     * @var Builder
+     */
     protected $builder;
 
     protected $offerTicketSchema = [
@@ -84,8 +99,6 @@ class Controller
         $this->printer = $job->printer;
         $this->builder = new Builder();
 
-        $this->builder->addSettings($this->printer);
-
         $this->builder->textFont();
         $this->builder->textStyle();
         $this->builder->textDouble();
@@ -105,6 +118,8 @@ class Controller
         if ($this->printer->hasCutter) {
             $this->builder->cut();
         }
+
+        $this->builder->addSettings($this->printer);
     }
 
     /**

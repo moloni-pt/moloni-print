@@ -2,12 +2,16 @@
 
 namespace MoloniPrint\Jobs;
 
+use DateTime;
+use Exception;
+use MoloniPrint\Job;
 use MoloniPrint\Table\Table;
 use MoloniPrint\Utils\Tools;
 
 class Document extends Common
 {
 
+    protected $ultraSmallWidth = 34;
     protected $documentSchema = [
         'image',
         'header' => [
@@ -27,6 +31,8 @@ class Document extends Common
         'relatedDocuments',
         'shippingDetails',
         'notes',
+        'footer',
+        'documentFooter',
         'productsCounter',
         'productsWithQuantityCounter',
         'linebreak',
@@ -54,9 +60,9 @@ class Document extends Common
 
     /**
      * Document constructor.
-     * @param \MoloniPrint\Job $job
+     * @param Job $job
      */
-    public function __construct(\MoloniPrint\Job &$job)
+    public function __construct(Job $job)
     {
         parent::__construct($job);
     }
@@ -121,24 +127,13 @@ class Document extends Common
           $this->builder->text($this->labels->second_way);
           } else {
           $this->builder->text($this->labels->original);
-          }
+          }a
          */
 
-        switch ($this->currentCopy) {
-            case 1:
-                $this->builder->text($this->labels->original);
-                break;
-            case 2:
-                $this->builder->text($this->labels->duplicate);
-                break;
-
-            case 3:
-                $this->builder->text($this->labels->triplicate);
-                break;
-
-            case 4:
-                $this->builder->text($this->labels->quadruplicate);
-                break;
+        if ($this->printer->copies > 1) {
+            $this->builder->variable('#CopyNumber#');
+        } else {
+            $this->builder->text($this->labels->original);
         }
 
         $this->linebreak();
@@ -208,10 +203,12 @@ class Document extends Common
     public function documentDate()
     {
         try {
-            $date = new \DateTime($this->document['lastmodified']);
-            $dateFormatted = $date->format("d-m-Y H:i");
-        } catch (\Exception $exception) {
-            $dateFormatted = $this->document['lastmodified'];
+            $closingHours = new DateTime($this->document['lastmodified']);
+            $closingDate = new DateTime($this->document['date']);
+
+            $dateFormatted = $closingDate->format('d-m-Y') . ' ' . $closingHours->format('H:i');
+        } catch (Exception $exception) {
+            $dateFormatted = $this->document['date'];
         }
 
         $this->builder->textStyle(false, false, true);
@@ -329,25 +326,39 @@ class Document extends Common
             $this->linebreak();
 
             $table = new Table($this->builder, $this->printer);
-            $table->addColumns([null, 7, 12, 10]);
+            $table->addColumns([null, 7, 12, 12]);
 
-            $headerStyle = ["emphasized" => true, "condensed" => true, "alignment" => "RIGHT"];
+            $headerStyle = ['emphasized' => true, 'condensed' => true, 'alignment' => 'RIGHT'];
             $table->addCells(['', $this->labels->value, $this->labels->incidence, $this->labels->total], $headerStyle);
 
             $table->addLineSplit();
 
             foreach ($this->taxes as $name => $tax) {
-                $table->addCell($name, ["condensed" => true]);
-                $table->addCell(Tools::priceFormat($tax['value'], '%'), ["condensed" => true, "alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($tax['incidence'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($tax['total'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
+                $table->newRow();
+                $table->addCell($name, ['condensed' => true]);
+
+                if ($this->printer->condensedWidth <= $this->ultraSmallWidth) {
+                    $table->newRow();
+                    $table->addCell('');
+                }
+
+                $table->addCell(Tools::priceFormat($tax['value'], '%'), ['condensed' => true, 'alignment' => 'RIGHT']);
+                $table->addCell(Tools::priceFormat($tax['incidence'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
+                $table->addCell(Tools::priceFormat($tax['total'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
             }
 
             foreach ($this->exemptions as $exemption) {
-                $table->addCell($exemption['description'], ["condensed" => true]);
-                $table->addCell(Tools::priceFormat($exemption['total'], '%'), ["condensed" => true, "alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($exemption['incidence'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($exemption['total'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
+                $table->newRow();
+                $table->addCell($exemption['description'], ['condensed' => true]);
+
+                if ($this->printer->condensedWidth <= $this->ultraSmallWidth) {
+                    $table->newRow();
+                    $table->addCell('');
+                }
+
+                $table->addCell(Tools::priceFormat($exemption['total'], '%'), ['condensed' => true, 'alignment' => 'RIGHT']);
+                $table->addCell(Tools::priceFormat($exemption['incidence'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
+                $table->addCell(Tools::priceFormat($exemption['total'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
             }
 
             $table->drawTable();
@@ -362,22 +373,22 @@ class Document extends Common
             $this->builder->addTittle($this->labels->mb_references);
             $this->linebreak();
             $table = new Table($this->builder, $this->printer);
-            $table->addColumns([null, 14, 15]);
+            $table->addColumns([null, 14, 12]);
 
-            $table->addCell($this->labels->entity, ["emphasized" => true, "condensed" => true]);
-            $table->addCell($this->labels->reference_short, ["emphasized" => true, "condensed" => true]);
-            $table->addCell($this->labels->value, ["emphasized" => true, "condensed" => true, "alignment" => "RIGHT"]);
+            $table->addCell($this->labels->entity_short, ['emphasized' => true, 'condensed' => true]);
+            $table->addCell($this->labels->reference_short, ['emphasized' => true, 'condensed' => true]);
+            $table->addCell($this->labels->value, ['emphasized' => true, 'condensed' => true, 'alignment' => 'RIGHT']);
             $table->addLineSplit();
 
             foreach ($this->document['mb_references'] as $reference) {
                 $table->newRow();
 
-                $fullReference = str_pad($reference['sub_entity'], 3, "0", STR_PAD_LEFT);
-                $fullReference .= str_pad($reference['reference'], 4, "0", STR_PAD_LEFT);
-                $fullReference .= str_pad($reference['check_digits'], 2, "0", STR_PAD_LEFT);
+                $fullReference = str_pad($reference['sub_entity'], 3, '0', STR_PAD_LEFT);
+                $fullReference .= str_pad($reference['reference'], 4, '0', STR_PAD_LEFT);
+                $fullReference .= str_pad($reference['check_digits'], 2, '0', STR_PAD_LEFT);
                 $fullReference = chunk_split($fullReference, 3, ' ');
-                $table->addCells([$reference['entity'], $fullReference], ["condensed" => true]);
-                $table->addCell(Tools::priceFormat($reference['value']), ["condensed" => true, "alignment" => "RIGHT"]);
+                $table->addCells([$reference['entity'], $fullReference], ['condensed' => true]);
+                $table->addCell(Tools::priceFormat($reference['value']), ['condensed' => true, 'alignment' => 'RIGHT']);
             }
 
             $table->drawTable();
@@ -393,18 +404,26 @@ class Document extends Common
             $this->linebreak();
 
             $table = new Table($this->builder, $this->printer);
-            $table->addColumns([null, 15]);
+            $table->addColumns([null, 15, 15]);
 
-            $headerStyle = ["emphasized" => true, "condensed" => true, "alignment" => "RIGHT"];
-            $table->addCells(['', $this->labels->total], $headerStyle);
+            $headerStyle = ['emphasized' => true, 'condensed' => true, 'alignment' => 'RIGHT'];
+            $table->addCells(['', $this->labels->date, $this->labels->total], $headerStyle);
             $table->addLineSplit();
 
             foreach ($this->document['payments'] as $payment) {
                 $table->newRow();
-                $table->addCell($payment['payment_method_name'], ["condensed" => true]);
-                $table->addCell(Tools::priceFormat($payment['value'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
+                $table->addCell($payment['payment_method_name'], ['condensed' => true]);
+
+                if ($this->printer->condensedWidth <= $this->ultraSmallWidth) {
+                    $table->newRow();
+                    $table->addCell('');
+                }
+
+                $table->addCell(Tools::dateFormat($payment['date'], 'd-m-Y'), ['condensed' => true, 'alignment' => 'RIGHT']);
+                $table->addCell(Tools::priceFormat($payment['value'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
                 if (!empty($payment['notes'])) {
-                    $table->addCell($this->labels->obs_short . ': ' . $payment['notes'], ["condensed" => true]);
+                    $table->newRow();
+                    $table->addCell($this->labels->obs_short . ': ' . $payment['notes'], ['condensed' => true]);
                 }
             }
 
@@ -415,37 +434,45 @@ class Document extends Common
 
     public function relatedDocuments()
     {
-        if (!empty($this->document['associated_documents'])) {
+        if (!empty($this->document['associated_documents']) && (int)$this->company['docs_show_related'] === 1) {
             $this->linebreak();
             $this->builder->addTittle($this->labels->associated_documents);
             $this->linebreak();
 
             $table = new Table($this->builder, $this->printer);
-            $table->addColumns([null, 10, 10, 20]);
+            $table->addColumns([null, 10, 11, 11]);
 
-            $headerStyle = ["emphasized" => true, "condensed" => true, "alignment" => "RIGHT"];
-            $table->addCells(['', $this->labels->date, $this->labels->value, $this->labels->conciliated], $headerStyle);
+            $headerStyle = ['emphasized' => true, 'condensed' => true, 'alignment' => 'RIGHT'];
+            $table->addCells(['', $this->labels->date, $this->labels->value, 'Conciliado'], $headerStyle);
             $table->addLineSplit();
 
             foreach ($this->document['associated_documents'] as $document) {
                 try {
-                    $date = new \DateTime($document['associated_document']['date']);
-                    $dateFormatted = $date->format("d-m-Y");
-                } catch (\Exception $exception) {
+                    $date = new DateTime($document['associated_document']['date']);
+                    $dateFormatted = $date->format('d-m-Y');
+                } catch (Exception $exception) {
                     $dateFormatted = $document['associated_document']['date'];
                 }
 
                 $documentName = $this->labels->document_types[$document['associated_document']['document_type_id']];
-                $table->addCell($documentName . ' ' . $document['associated_document']['document_set_name'] . '/' . $document['associated_document']['number'], ["condensed" => true]);
+                $table->addCell($documentName . ' ' . $document['associated_document']['document_set_name'] . '/' . $document['associated_document']['number'], ['condensed' => true]);
 
                 if ($this->printer->condensedWidth < 60) {
                     $table->newRow();
                     $table->addCell('');
                 }
 
-                $table->addCell($dateFormatted, ["condensed" => true, "alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($document['associated_document']['net_value'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($document['value'], $this->currency), ["condensed" => true, "alignment" => "RIGHT"]);
+                $table->addCell($dateFormatted, ['condensed' => true, 'alignment' => 'RIGHT']);
+
+                /* Hide the value from a global guide */
+                if((int)$document['associated_document']['global_guide'] === 1) {
+                    $table->addCell('', ['condensed' => true, 'alignment' => 'RIGHT']);
+                } else {
+                    $table->addCell(Tools::priceFormat($document['associated_document']['net_value'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
+                }
+
+
+                $table->addCell(Tools::priceFormat($document['value'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
             }
 
             $table->drawTable();
@@ -478,7 +505,7 @@ class Document extends Common
             if (!empty($this->document['delivery_method_name'])) {
                 $this->linebreak();
                 $this->builder->textStyle(false, false, true);
-                $this->builder->text($this->labels->shippingMethod . ": ");
+                $this->builder->text($this->labels->shippingMethod . ': ');
                 $this->builder->textStyle(false, false, false);
                 $this->builder->text($this->document['delivery_method_name']);
             }
@@ -486,7 +513,7 @@ class Document extends Common
             if (!empty($this->document['delivery_datetime'])) {
                 $this->linebreak();
                 $this->builder->textStyle(false, false, true);
-                $this->builder->text($this->labels->beginning . ": ");
+                $this->builder->text($this->labels->beginning . ': ');
                 $this->builder->textStyle(false, false, false);
                 $this->builder->text(Tools::dateFormat($this->document['delivery_datetime']));
             }
@@ -497,7 +524,7 @@ class Document extends Common
                 !empty($this->document['delivery_departure_country_details']['name'])) {
                 $this->linebreak();
                 $this->builder->textStyle(false, false, true);
-                $this->builder->text($this->labels->departure_place . ":");
+                $this->builder->text($this->labels->departure_place . ':');
                 $this->builder->textStyle(false, false, false);
                 $this->builder->text(' ' . $this->document['delivery_departure_address']);
                 $this->builder->text(', ' . $this->document['delivery_departure_zip_code']);
@@ -511,7 +538,7 @@ class Document extends Common
                 !empty($this->document['delivery_destination_country'])) {
                 $this->linebreak();
                 $this->builder->textStyle(false, false, true);
-                $this->builder->text($this->labels->destination_place . ":");
+                $this->builder->text($this->labels->destination_place . ':');
                 $this->builder->textStyle(false, false, false);
                 $this->builder->text(' ' . $this->document['delivery_destination_address']);
                 $this->builder->text(', ' . $this->document['delivery_destination_zip_code']);
@@ -522,7 +549,7 @@ class Document extends Common
             if (!empty($this->document['vehicle_name'])) {
                 $this->linebreak();
                 $this->builder->textStyle(false, false, true);
-                $this->builder->text($this->labels->vehicle . ":");
+                $this->builder->text($this->labels->vehicle . ':');
                 $this->builder->textStyle(false, false, false);
                 $this->builder->text(' ' . $this->document['vehicle_name']);
                 if (!empty($this->document['vehicle_name'])) {
@@ -559,9 +586,9 @@ class Document extends Common
     public function productsAvailabilityNote()
     {
         try {
-            $date = new \DateTime($this->document['lastmodified']);
-            $dateFormatted = $date->format("d-m-Y");
-        } catch (\Exception $exception) {
+            $date = new DateTime($this->document['date']);
+            $dateFormatted = $date->format('d-m-Y');
+        } catch (Exception $exception) {
             $dateFormatted = $this->document['lastmodified'];
         }
 
@@ -593,7 +620,7 @@ class Document extends Common
     {
         $this->linebreak();
         // Credit notes require a customer signature
-        if ($this->document['document_type']['saft_code'] == 'NC') {
+        if ($this->document['document_type']['saft_code'] === 'NC') {
             $this->signature();
         }
 
@@ -605,6 +632,40 @@ class Document extends Common
 
             $this->builder->text($this->document['notes']);
             $this->linebreak();
+        }
+    }
+
+    public function footer()
+    {
+        if (isset($this->document['document_set']['template']['documents_footnote'])) {
+            $footer = trim(strip_tags($this->document['document_set']['template']['documents_footnote']));
+        } else {
+            $footer = trim(strip_tags($this->company['docs_footer']));
+        }
+
+
+        if (!empty($footer)) {
+            $this->builder->textFont('A');
+            $this->builder->textDouble();
+            $this->builder->textAlign();
+            $this->builder->textStyle();
+
+            $this->builder->text($footer);
+            $this->linebreak();
+        }
+    }
+
+    public function documentFooter()
+    {
+        // If the document is a FT, FS or FR print the terminal message
+        if (!empty($this->terminal['document_settings']) && is_array($this->terminal['document_settings'])) {
+            foreach ($this->terminal['document_settings'] as $documentSetting) {
+                if ($documentSetting['document_type_id'] == $this->document['document_type_id'] && !empty($documentSetting['footer'])) {
+                    $this->linebreak();
+                    $this->builder->text($documentSetting['footer']);
+                    $this->linebreak();
+                }
+            }
         }
     }
 
@@ -632,6 +693,14 @@ class Document extends Common
 
             $table->drawTable();
             $this->drawProductsFullResume();
+        } else {
+            $this->builder->textFont('C');
+            $this->builder->textDouble(true, true);
+            $this->builder->textAlign('RIGHT');
+            $this->builder->text($this->labels->total . ': ' . Tools::priceFormat($this->document['net_value']));
+            $this->builder->textDouble();
+            $this->builder->textAlign();
+            $this->linebreak();
         }
     }
 
@@ -639,24 +708,34 @@ class Document extends Common
     {
         $table->addColumn();
         $table->addColumn(7);
-        $table->addColumn(12);
+
+        if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
+            $table->addColumn(14);
+        }
 
         if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
             $table->addColumn(8);
         }
 
-        $table->addColumn(8);
-        $table->addColumn(12);
+        if ($this->printer->condensedWidth > 48) {
+            $table->addColumn(10);
+        } else {
+            $table->addColumn(6);
+        }
+
+        $table->addColumn(14);
 
         $headerStyle = [
-            "emphasized" => true,
-            "condensed" => true,
-            "alignment" => "RIGHT"
+            'emphasized' => true,
+            'condensed' => true,
+            'alignment' => 'RIGHT'
         ];
 
         $table->addCell('', $headerStyle);
         $table->addCell($this->labels->qty, $headerStyle);
-        $table->addCell($this->labels->pvp_unit_short, $headerStyle);
+        if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
+            $table->addCell($this->labels->pvp_unit_short, $headerStyle);
+        }
 
         if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
             $table->addCell($this->labels->discount_short, $headerStyle);
@@ -666,29 +745,36 @@ class Document extends Common
         $table->addCell($this->labels->total, $headerStyle);
     }
 
-    private function drawProductsFullLine(Table &$table, $product)
+    private function drawProductsFullLine(Table $table, $product)
     {
         $description = $this->terminal['print_products_reference'] ? $product['reference'] . ' ' : '';
         $description .= $product['name'];
         $table->addCell($description);
         $table->newRow();
 
-        if ($this->terminal['print_products_summary'] && !empty($product['summary'])) {
+        if (
+            !empty($product['summary']) && (
+                (!isset($this->terminal['print_products_summary']) && $this->company['docs_show_products_summary']) ||
+                $this->terminal['print_products_summary']
+            )) {
             $table->addCell($product['summary'], ['condensed' => true]);
             $table->newRow();
+
         }
 
         $bodyStyle = [
-            "alignment" => "RIGHT"
+            'alignment' => 'RIGHT'
         ];
 
         $table->addCell('');
         $table->addCell($product['quantity'], $bodyStyle);
 
-        if ($this->company['docs_show_unit_price_with_taxes'] == 1) {
-            $table->addCell($product['unitPriceWithTaxes'], $bodyStyle);
-        } else {
-            $table->addCell($product['unitPrice'], $bodyStyle);
+        if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
+            if ($this->company['docs_show_unit_price_with_taxes'] == 1) {
+                $table->addCell($product['unitPriceWithTaxes'], $bodyStyle);
+            } else {
+                $table->addCell($product['unitPrice'], $bodyStyle);
+            }
         }
 
         if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
@@ -708,34 +794,39 @@ class Document extends Common
     private function drawProductsFullResume()
     {
         $table = new Table($this->builder, $this->printer);
-        $table->addColumn();
-        $table->addColumn(20);
-        $table->addCell($this->labels->gross_total, ["alignment" => "RIGHT"]);
-        $table->addCell(Tools::priceFormat($this->document['gross_value']), ["alignment" => "RIGHT"]);
+        $table->addColumns([null, 20]);
+        $table->addCell($this->labels->gross_total, ['alignment' => 'RIGHT']);
+        $table->addCell(Tools::priceFormat($this->document['gross_value']), ['alignment' => 'RIGHT']);
+
+        if ($this->document['financial_discount_value'] > 0) {
+            $table->addCell($this->labels->financial_discount, ['alignment' => 'RIGHT']);
+            $table->addCell(Tools::priceFormat($this->document['financial_discount_value']), ['alignment' => 'RIGHT']);
+        }
 
         if ($this->document['comercial_discount_value'] > 0) {
-            $table->addCell($this->labels->total_discounts, ["alignment" => "RIGHT"]);
-            $table->addCell(Tools::priceFormat($this->document['comercial_discount_value']), ["alignment" => "RIGHT"]);
+            $table->addCell($this->labels->commercial_discount, ['alignment' => 'RIGHT']);
+            $table->addCell(Tools::priceFormat($this->document['comercial_discount_value']), ['alignment' => 'RIGHT']);
         }
 
         if (!empty($this->taxes)) {
             foreach ($this->taxes as $name => $values) {
-                $table->addCell($name, ["alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($values['total']), ["alignment" => "RIGHT"]);
+                $table->addCell($name, ['alignment' => 'RIGHT']);
+                $table->addCell(Tools::priceFormat($values['total']), ['alignment' => 'RIGHT']);
             }
         }
 
         if (!empty($this->deductions)) {
             foreach ($this->deductions as $name => $value) {
-                $table->addCell($name, ["alignment" => "RIGHT"]);
-                $table->addCell(Tools::priceFormat($value), ["alignment" => "RIGHT"]);
+                $table->addCell($name, ['alignment' => 'RIGHT']);
+                $table->addCell(Tools::priceFormat($value), ['alignment' => 'RIGHT']);
             }
         }
 
-        $table->addCell($this->labels->total, ["alignment" => "RIGHT", 'emphasized' => true]);
-        $table->addCell(Tools::priceFormat($this->document['net_value']), ["alignment" => "RIGHT", 'emphasized' => true]);
+        $table->addCell($this->labels->total, ['alignment' => 'RIGHT', 'emphasized' => true]);
+        $table->addCell(Tools::priceFormat($this->document['net_value']), ['alignment' => 'RIGHT', 'emphasized' => true]);
 
         if (isset($this->document['exchange_currency']) && !empty(isset($this->document['exchange_currency']))) {
+            $table->newRow();
             $this->drawProductsResumeExchangeRates($table);
         }
 
@@ -748,36 +839,39 @@ class Document extends Common
      */
     private function drawProductsResumeExchangeRates(Table $table)
     {
-        $table->addCells([' ', ' ']);
-        $table->addCell($this->labels->total . ' ' . $this->company['currency']['iso4217'], ["alignment" => "RIGHT", 'condensed' => true]);
-        $table->addCell(Tools::priceFormat(
+        $table->addCells(['', '']);
+        $table->newRow();
+        $table->addCell($this->labels->total . ' ' . $this->company['currency']['iso4217'], ['alignment' => 'RIGHT', 'condensed' => true]);
+        $totalBaseCurrency = Tools::priceFormat(
             $this->document['net_value'],
-            $this->company['currency']['symbol'],
+            '€',
             2,
             ',',
             '.',
             $this->company['currency']['symbol_right'],
             1
-        ), ["alignment" => "RIGHT", 'condensed' => true]);
+        );
+        $table->addCell($totalBaseCurrency, ['alignment' => 'RIGHT', 'condensed' => true]);
 
-        $table->addCell($this->labels->exchange_rate, ["alignment" => "RIGHT", 'condensed' => true]);
+        $table->addCell($this->labels->exchange_rate, ['alignment' => 'RIGHT', 'condensed' => true]);
         $exchangeRateString = Tools::priceFormat(
                 1,
-                $this->company['currency']['symbol'],
+                '€',
                 2,
                 ',',
                 '.',
                 $this->company['currency']['symbol_right'],
                 1
-            ) . "=" . Tools::priceFormat(1);
-        $table->addCell($exchangeRateString, ["alignment" => "RIGHT", 'condensed' => true]);
+            ) . '=' . Tools::priceFormat(1);
+
+        $table->addCell(html_entity_decode($exchangeRateString), ['alignment' => 'RIGHT', 'condensed' => true]);
     }
 
     protected function parseEntities()
     {
         if ($this->company['country_id'] == 1 &&
             trim($this->document['entity_vat']) == '999999990' &&
-            trim($this->document['entity_name']) == 'Consumidor Final') {
+            trim($this->document['entity_name']) === 'Consumidor Final') {
             $this->isFinalConsumer = true;
         }
 
@@ -829,11 +923,12 @@ class Document extends Common
             $product['totalPriceWithTaxes'] = ($product['unitPriceWithDiscounts'] * $raw['qty']);
 
             if (isset($raw['taxes']) && !empty($raw['taxes'])) {
+                $originalIncidenceValue = $raw['price'];
                 foreach ($raw['taxes'] as $tax) {
                     $this->taxes[$tax['name']]['value'] = $tax['value'];
                     $this->taxes[$tax['name']]['incidence'] += $tax['incidence_value'];
                     $this->taxes[$tax['name']]['total'] += $tax['total_value'];
-                    $product['unitPriceWithTaxes'] += $tax['total_value'] / $raw['qty'];
+                    $product['unitPriceWithTaxes'] += ((int)$tax['type'] === 1) ? ($originalIncidenceValue * ($tax['value'] / 100)) : ($tax['total_value'] / $raw['qty']);
                     $product['totalPriceWithTaxes'] += $tax['total_value'];
                     $product['tax'] = $tax['value'] . ($tax['type'] == 1 ? '%' : $this->currency);
                 }
@@ -850,7 +945,7 @@ class Document extends Common
                 $this->deductions[$raw['deduction_name']] = ($product['unitPriceWithDiscounts'] * $raw['deduction']) / 100;
             }
 
-            $product['discount'] = floatval(round($product['discount'], 2)) . "%";
+            $product['discount'] = (float)round($product['discount'], 2) . '%';
             $product['unitPrice'] = Tools::priceFormat($product['unitPrice'], $this->currency);
             $product['unitPriceWithTaxes'] = Tools::priceFormat($product['unitPriceWithTaxes'], $this->currency);
             $product['totalPrice'] = Tools::priceFormat($product['totalPrice'], $this->currency);

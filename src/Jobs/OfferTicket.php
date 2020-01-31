@@ -8,6 +8,22 @@ use MoloniPrint\Table\Table;
 class OfferTicket extends Document
 {
 
+    protected $offerTicketSchema = [
+        'image',
+        'header',
+        'documentDetails',
+        'entity',
+        'linebreak',
+        'products',
+        'linebreak',
+        'notes',
+        'documentFooter',
+        'linebreak',
+        'processedBy',
+        'poweredBy',
+        'linebreak',
+    ];
+
     /**
      * Document constructor.
      * @param Job $job
@@ -93,8 +109,10 @@ class OfferTicket extends Document
     public function documentDate()
     {
         try {
-            $date = new \DateTime($this->document['lastmodified']);
-            $dateFormatted = $date->format("d-m-Y H:i");
+            $closingHours = new \DateTime($this->document['lastmodified']);
+            $closingDate = new \DateTime($this->document['date']);
+
+            $dateFormatted = $closingDate->format("d-m-Y") . ' ' . $closingHours->format("H:i");
         } catch (\Exception $exception) {
             $dateFormatted = $this->document['lastmodified'];
         }
@@ -223,6 +241,15 @@ class OfferTicket extends Document
         $table->addLineSplit();
         $table->drawTable();
         $this->linebreak();
+    }
+
+    public function documentFooter()
+    {
+        if (isset($this->terminal['footer_gift']) && !empty($this->terminal['footer_gift'])) {
+            $this->linebreak();
+            $this->builder->text($this->terminal['footer_gift']);
+            $this->linebreak();
+        }
     }
 
     public function notes()

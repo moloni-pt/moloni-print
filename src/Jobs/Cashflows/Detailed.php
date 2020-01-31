@@ -268,7 +268,7 @@ class Detailed extends Cashflow
 
                 if ($totalValue > $totalAssociatedValue) {
                     $this->{$parseForDirection}[0]['name'] = $this->labels->undifferentiated;
-                    $this->{$parseForDirection}[0]['value'] += $totalValue - $totalAssociatedValue;
+                    $this->{$parseForDirection}[0]['value'] += $totalValue - $totalAssociatedValue - $movement['exchange_value'];
                 }
 
             }

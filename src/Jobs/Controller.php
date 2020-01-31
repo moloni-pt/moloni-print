@@ -20,6 +20,7 @@ class Controller
      * @var array
      */
     protected $company;
+
     /**
      * @var array
      */
@@ -36,21 +37,6 @@ class Controller
      * @var Builder
      */
     protected $builder;
-
-    protected $offerTicketSchema = [
-        'image',
-        'header',
-        'documentDetails',
-        'entity',
-        'linebreak',
-        'products',
-        'linebreak',
-        'notes',
-        'linebreak',
-        'processedBy',
-        'poweredBy',
-        'linebreak',
-    ];
 
     protected $cashflowRegularSchema = [
         'image',
@@ -117,6 +103,10 @@ class Controller
         $this->builder->textAlign();
         if ($this->printer->hasCutter) {
             $this->builder->cut();
+        }
+
+        if($this->printer->hasDrawer) {
+            $this->builder->openDrawer();
         }
 
         $this->builder->addSettings($this->printer);

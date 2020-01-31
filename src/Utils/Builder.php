@@ -94,7 +94,6 @@ class Builder
 
     public function image($path, $maxWidth = 576, $imageType = 'default')
     {
-
         switch ($imageType) {
             case 'path':
                 $this->printJob[] = [
@@ -180,6 +179,18 @@ class Builder
     }
 
     /**
+     * Add variable to the builder
+     * @param string $string
+     */
+    public function variable($string = '')
+    {
+        $this->printJob[] = [
+            'op' => 'variable',
+            'data' => $string
+        ];
+    }
+
+    /**
      * Set next text with the selected font
      * @param $font string (A, B, C)
      */
@@ -241,8 +252,8 @@ class Builder
      */
     public function textAlign($align = 'LEFT')
     {
-        if ($this->lastAlignment !== $this->align[$align]) {
-            $this->lastAlignment = $this->align[$align];
+        if ($this->lastAlignment !== $align) {
+            $this->lastAlignment = $align;
             $this->printJob[] = [
                 'op' => 'alignment',
                 'data' => (isset($this->align[$align]) ? $this->align[$align] : $this->align['LEFT'])
@@ -262,6 +273,17 @@ class Builder
         $this->printJob[] = [
             'op' => 'cut',
             'data' => 'feed'
+        ];
+    }
+
+    public function openDrawer()
+    {
+        $this->printJob[] = [
+            'op' => 'pulse',
+            'data' => [
+                'drawer' => 0,
+                'pulse' => 50
+            ]
         ];
     }
 

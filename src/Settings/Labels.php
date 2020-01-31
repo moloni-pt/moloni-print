@@ -23,6 +23,7 @@ class Labels
     public $cashflow_resume = "Consulta de caixa";
     public $cashflow_starting_amount = "Fundo de caixa";
     public $coin = "Moeda";
+    public $commercial_discount = "Desconto comercial";
     public $commercial_registration_number = "R.C.C. Nº";
     public $company = "Empresa";
     public $conciliated = "Valor Conciliado";
@@ -38,11 +39,13 @@ class Labels
     public $duplicate = "Duplicado";
     public $email = "Email";
     public $entity = "Entidade";
+    public $entity_short = "Ent.";
     public $exchange_rate = "Câmbio";
     public $outflow = "Saídas";
     public $expedition_method = "Método de Expedição";
     public $expenses = "Despesas";
     public $final = "Final";
+    public $financial_discount = "Desconto financeiro";
     public $gross_total = "Total Ilíquido";
     public $incidence = "Incidência";
     public $initial = "Inicial";

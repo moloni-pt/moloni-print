@@ -17,41 +17,41 @@ class Config extends Common
 
     public function create()
     {
-        $this->builder->textFont("A");
+        $this->builder->textFont('A');
         $this->builder->textDouble(true, true);
-        $this->builder->text("Impressão de teste");
+        $this->builder->text('Impressão de teste');
 
         $this->linebreak();
         $this->linebreak();
 
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
-        $this->builder->text("Teste de imagem");
+        $this->builder->text('Teste de imagem');
 
         $this->linebreak();
         $this->linebreak();
 
         $this->builder->textStyle();
-        $this->builder->text("Confirme se a imagem aparece correctamente");
+        $this->builder->text('Confirme se a imagem aparece correctamente');
 
         $this->linebreak();
         $this->linebreak();
 
-        $this->builder->image('https://www.moloni.pt/_imagens/_tmpl/ac_logo_topo_default_01.png');
+        $this->builder->image('ac/fe_v2_logo_moloni_inverted_topo.png&goToPublic=true', $this->printer->dotWidth, $this->printer->imageType);
 
         $this->linebreak();
         $this->linebreak();
 
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
-        $this->builder->text("Testes de texto");
+        $this->builder->text('Testes de texto');
 
         $this->linebreak();
         $this->linebreak();
 
         $this->builder->textDouble();
         $this->builder->textStyle();
-        $this->builder->text("Confirme que as próximas duas linhas ocupam apenas uma linha cada:");
+        $this->builder->text('Confirme que as próximas duas linhas ocupam apenas uma linha cada:');
 
         $this->linebreak();
         $this->linebreak();
@@ -70,13 +70,13 @@ class Config extends Common
             $string .= (($i + 1) % 10);
         }
 
-        $this->builder->textFont("C");
+        $this->builder->textFont('C');
         $this->builder->text($string);
 
         $this->linebreak();
         $this->linebreak();
 
-        $this->builder->textFont("A");
+        $this->builder->textFont('A');
         $this->builder->text('Confirme se os seguintes caracteres especiais aparecem correctamente.');
         $this->linebreak();
         $this->builder->text('Deverão ser quatro acentuações de "a", "e", "i", "o", e ainda um c cedilhado e um símbolo do euro.');
@@ -97,22 +97,22 @@ class Config extends Common
 
 
         if ($this->printer->hasCutter || $this->printer->hasDrawer) {
-            $this->builder->textFont("A");
+            $this->builder->textFont('A');
             $this->builder->textStyle(false, false, true);
-            $this->builder->text("Testes de serviço");
+            $this->builder->text('Testes de serviço');
             $this->linebreak();
             $this->linebreak();
 
             $this->builder->textStyle();
 
             if ($this->printer->hasDrawer) {
-                $this->builder->text("Confirme se a impressora abriu a gaveta");
+                $this->builder->text('Confirme se a impressora abriu a gaveta');
                 $this->linebreak();
 
             }
 
             if ($this->printer->hasCutter) {
-                $this->builder->text("Confirme se a impressora cortou o papel");
+                $this->builder->text('Confirme se a impressora cortou o papel');
                 $this->linebreak();
             }
 

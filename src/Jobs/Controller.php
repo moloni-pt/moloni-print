@@ -2,14 +2,16 @@
 
 namespace MoloniPrint\Jobs;
 
+use MoloniPrint\Job;
+use MoloniPrint\Settings\Labels;
 use MoloniPrint\Utils\Builder;
 use MoloniPrint\Utils\Tools;
 
 class Controller
 {
 
-    protected $mainUrl = "https://moloni.pt";
-    protected $imageUrl = "https://moloni.pt/_imagens/";
+    protected $mainUrl = 'https://moloni.pt';
+    protected $imageUrl = 'https://moloni.pt/_imagens/';
 
     protected $logActive = false;
     protected $processStarted = false;
@@ -26,7 +28,7 @@ class Controller
      */
     protected $terminal;
     /**
-     * @var \MoloniPrint\Settings\Labels
+     * @var Labels
      */
     protected $labels;
     /**
@@ -75,9 +77,9 @@ class Controller
 
     /**
      * Common constructor.
-     * @param \MoloniPrint\Job $job
+     * @param Job $job
      */
-    public function __construct(\MoloniPrint\Job &$job)
+    public function __construct(Job $job)
     {
         $this->company = $job->company;
         $this->terminal = $job->terminal;
@@ -171,7 +173,7 @@ class Controller
                 $this->lastLog = $this->processStarted;
             }
             $now = microtime(true);
-            array_push($this->logToSend, $message . "\r\n\t@ " . number_format($now - $this->processStarted, 3, '.', ',') . ' (' . number_format($now - $this->lastLog, 3, '.', ',') . ')');
+            $this->logToSend[] = $message . "\r\n\t@ " . number_format($now - $this->processStarted, 3, '.', ',') . ' (' . number_format($now - $this->lastLog, 3, '.', ',') . ')';
             $this->lastLog = $now;
         }
     }
@@ -182,7 +184,7 @@ class Controller
     public function sendLog()
     {
         if ($this->logActive) {
-            die(join("\r\n\r\n", $this->logToSend));
+            die(implode("\r\n\r\n", $this->logToSend));
         }
 
     }

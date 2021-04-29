@@ -2,6 +2,7 @@
 
 namespace MoloniPrint\Utils;
 
+use Exception;
 use MoloniPrint\Settings\Printer;
 
 class Builder
@@ -94,52 +95,74 @@ class Builder
 
     public function image($path, $maxWidth = 576, $imageType = 'default')
     {
-        switch ($imageType) {
-            case 'path':
-                $this->printJob[] = [
-                    'op' => 'image',
-                    'data' => $path
-                ];
-                break;
-            case 'default':
-            case 'base64':
-            default:
-                try {
-                    if (isset($this->store[$path . $maxWidth])) {
-                        $base64 = $this->store[$path . $maxWidth];
-                    } else {
-                        $maxPaperWidth = $maxWidth;
-                        $url = $this->imageUrl . '?macro=imgWebPOSCompanyLogoPrinterRaw&img=' . $path;
-                        $image = new \Imagick($url);
-
-                        $image->setImageFormat("png");
-
-                        $imageWidth = $maxWidth;
-                        $imageHeight = ceil($maxWidth * $image->getImageHeight() / $image->getImageWidth());
-
-                        if ($imageHeight > ($imageWidth / 3)) {
-                            $newImageHeight = ceil($imageWidth / 3);
-                            $imageWidth = floor($imageWidth * ($newImageHeight / $imageHeight));
-                            $imageHeight = $newImageHeight;
-                            $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
-                            $image->extentImage($maxPaperWidth, $imageHeight, 0, 0);
-                        } else {
-                            $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
-                        }
-
-                        $base64 = base64_encode($image->getimageblob());
-                        $this->store[$url . $maxWidth] = $base64;
-                    }
-
+        try {
+            switch ($imageType) {
+                case 'path':
                     $this->printJob[] = [
                         'op' => 'image',
-                        'data' => 'data:image/png;base64,' . $base64
+                        'data' => $path
                     ];
-                } catch (\Exception $exception) {
+                    break;
+                case 'qr':
+                    $this->printJob[] = [
+                        'op' => 'image',
+                        'data' => 'data:image/png;base64,' . $this->getImageBase64($path, $maxWidth > 260 ? 260 : $maxWidth, true)
+                    ];
 
-                }
-                break;
+                    break;
+                case 'default':
+                case 'base64':
+                default:
+                    $url = $this->imageUrl . '?macro=imgWebPOSCompanyLogoPrinterRaw&img=' . $path;
+                    $this->printJob[] = [
+                        'op' => 'image',
+                        'data' => 'data:image/png;base64,' . $this->getImageBase64($url, $maxWidth)
+                    ];
+
+                    break;
+            }
+        } catch (Exception $exception) {
+
         }
+    }
+
+    /**
+     * Obter um base64 de uma URL ou path
+     *
+     * @param string $url
+     * @param int $maxWidth
+     * @param bool $avoidResize
+     * @return mixed|string
+     * @throws \ImagickException
+     */
+    protected function getImageBase64($url, $maxWidth = 576, $avoidResize = false)
+    {
+        $storeIndex = $url . $maxWidth;
+        if (isset($this->store[$storeIndex])) {
+            return $this->store[$url . $maxWidth];
+        }
+
+        $maxPaperWidth = $maxWidth;
+        $image = new \Imagick($url);
+
+        $image->setImageFormat("png");
+
+        $imageWidth = $maxWidth;
+        $imageHeight = ceil($maxWidth * $image->getImageHeight() / $image->getImageWidth());
+
+        if ($imageHeight > ($imageWidth / 3) && !$avoidResize) {
+            $newImageHeight = ceil($imageWidth / 3);
+            $imageWidth = floor($imageWidth * ($newImageHeight / $imageHeight));
+            $imageHeight = $newImageHeight;
+            $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
+            $image->extentImage($maxPaperWidth, $imageHeight, 0, 0);
+        } else {
+            $image->resizeImage($imageWidth, $imageHeight, \Imagick::FILTER_BOX, 0);
+        }
+
+        $base64 = base64_encode($image->getimageblob());
+        $this->store[$storeIndex] = $base64;
+        return $base64;
     }
 
     /***************************************************

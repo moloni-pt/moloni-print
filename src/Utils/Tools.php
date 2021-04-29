@@ -9,10 +9,15 @@ class Tools
     public static $currency = '€';
     public static $symbolRight = 1;
 
-    public static function dateFormat($dateInput, $format = 'd-m-Y H:i')
+    public static function dateFormat($dateInput, $format = 'd-m-Y H:i', $timezone = false)
     {
         try {
             $date = new \DateTime($dateInput);
+
+            if ($timezone) {
+                $date->setTimezone(new \DateTimeZone($timezone));
+            }
+
             $dateFormatted = $date->format($format);
         } catch (\Exception $exception) {
             $dateFormatted = $dateInput;

@@ -15,6 +15,11 @@ class Common extends Controller
     protected $isFinalConsumer = false;
     protected $hasAddress = true;
 
+    protected $documentsAreNotValidInvoices = [
+        'FF', 'VDF', 'NCF', 'NDVF', 'FSF', 'AV',
+        'GC', 'GA', 'GD', 'PGF', 'DI', 'SM', 'SMVD',
+        'SMFS', 'SMNC', 'SMND', 'SMFR', 'CM'
+    ];
 
     /**
      * Common constructor.
@@ -31,7 +36,11 @@ class Common extends Controller
     public function image()
     {
         if (!empty($this->document['document_set']['template']['image'])) {
-            $this->builder->image($this->document['document_set']['template']['image'], $this->printer->dotWidth, $this->printer->imageType);
+            $this->builder->image(
+                $this->document['document_set']['template']['image'],
+                $this->printer->dotWidth,
+                $this->printer->imageType
+            );
             $this->linebreak();
         } elseif (!empty($this->company['image'])) {
             $this->builder->image($this->company['image'], $this->printer->dotWidth, $this->printer->imageType);
@@ -79,14 +88,34 @@ class Common extends Controller
 
         $this->builder->text($this->labels->vat . ': ' . $this->company['vat'] . "\n");
         if (isset($this->document['document_set']['template']) && !empty($this->document['document_set']['template'])) {
-            $this->builder->text($this->document['document_set']['template']['address'] . "\n");
+            if (!empty($this->document['document_set']['template']['address'])) {
+                $this->builder->text($this->document['document_set']['template']['address'] . "\n");
+            }
 
-            $this->builder->text($this->document['document_set']['template']['zip_code'] . ' ');
-            $this->builder->text($this->document['document_set']['template']['city'] . ', ');
+            if (!empty($this->document['document_set']['template']['zip_code'])) {
+                $this->builder->text($this->document['document_set']['template']['zip_code'] . ' ');
+            }
+
+            if (!empty($this->document['document_set']['template']['city'])) {
+                $this->builder->text($this->document['document_set']['template']['city'] . ', ');
+            }
+
             $this->builder->text($this->document['document_set']['template']['country']['name'] . "\n");
         } else {
-            $this->builder->text($this->company['address'] . "\n");
-            $this->builder->text($this->company['zip_code'] . ' ' . $this->company['city'] . ', ' . $this->company['country']['name'] . "\n");
+            if (!empty($this->company['address'])) {
+                $this->builder->text($this->company['address'] . "\n");
+            }
+
+            if (!empty($this->company['zip_code'])) {
+                $this->builder->text($this->company['zip_code'] . ' ');
+            }
+
+            if (!empty($this->company['city'])) {
+                $this->builder->text($this->company['city'] . ', ');
+            }
+
+            $this->builder->text( $this->company['country']['name']);
+            $this->linebreak();
         }
     }
 
@@ -125,10 +154,10 @@ class Common extends Controller
      */
     public function companySocialCapital()
     {
-        $this->builder->textStyle(false, false, false);
-        $this->builder->textFont('C');
-
         if (!empty($this->company['capital']) || !empty($this->company['commercial_registration_number'])) {
+            $this->builder->textStyle(false, false, false);
+            $this->builder->textFont('C');
+
             if (!empty($this->company['capital'])) {
                 $this->builder->text($this->labels->social_capital . ': ' . $this->company['capital']);
                 if (!empty($this->company['commercial_registration_number'])) {
@@ -139,9 +168,9 @@ class Common extends Controller
             } else {
                 $this->builder->text($this->labels->commercial_registration_number . ': ' . $this->company['commercial_registration_number']);
             }
-        }
 
-        $this->linebreak();
+            $this->linebreak();
+        }
     }
 
     public function signature()

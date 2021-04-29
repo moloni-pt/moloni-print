@@ -1,13 +1,38 @@
 <?php
+/*
+ * Moloni, lda
+ *
+ * Aviso de propriedade e confidencialidade
+ * A distribuição ou reprodução deste documento (codigo) para além dos fins
+ * a que o mesmo se destina só é permitida com o consentimento por escrito
+ * por parte da Moloni.
+ *
+ * PHP version 5
+ *
+ * @category  BO-CATEGORIA
+ * @package   BackOffice
+ * @author    Nuno Almeida <nuno@moloni.com>
+ * @copyright 2020 Moloni, lda
+ * @license   Moloni, lda
+ * @link      https://www.moloni.pt
+ */
 
 namespace MoloniPrint\Jobs;
 
 use MoloniPrint\Job;
 use MoloniPrint\Table\Table;
 
+/**
+ * Class OfferTicket
+ *
+ * @package MoloniPrint\Jobs
+ */
 class OfferTicket extends Document
 {
 
+    /**
+     * @var array schema
+     */
     protected $offerTicketSchema = [
         'image',
         'header',
@@ -17,6 +42,7 @@ class OfferTicket extends Document
         'products',
         'linebreak',
         'notes',
+        'linebreak',
         'documentFooter',
         'linebreak',
         'processedBy',
@@ -26,20 +52,23 @@ class OfferTicket extends Document
 
     /**
      * Document constructor.
-     * @param Job $job
+     *
+     * @param Job $job current job
      */
-    public function __construct(Job &$job)
+    public function __construct(Job $job)
     {
         parent::__construct($job);
     }
 
     /**
      * Start by setting class variables and parsing entities and products
-     * @param array $document
-     * @param array $products
      * Array with products to be printed in the document
      * Format: $product => [product_id => 5, qty => 1]
-     * @return array|string
+     *
+     * @param array $document document
+     * @param array $products products
+     *
+     * @return array json format of print job
      */
     public function create(Array $document, $products = [])
     {
@@ -57,6 +86,8 @@ class OfferTicket extends Document
 
     /**
      * Draw block of document details and document identification
+     *
+     * @return void
      */
     public function documentDetails()
     {
@@ -69,6 +100,8 @@ class OfferTicket extends Document
      * Document identifications
      * Document Type
      * Document Set Name / Document Number
+     *
+     * @return void
      */
     public function documentIdentification()
     {
@@ -85,6 +118,8 @@ class OfferTicket extends Document
      * Terminal Name
      * Operator Name
      * Salesman Name
+     *
+     * @return void
      */
     public function documentTerminal()
     {
@@ -105,6 +140,8 @@ class OfferTicket extends Document
 
     /**
      * Show document last modified date
+     *
+     * @return void
      */
     public function documentDate()
     {
@@ -112,7 +149,7 @@ class OfferTicket extends Document
             $closingHours = new \DateTime($this->document['lastmodified']);
             $closingDate = new \DateTime($this->document['date']);
 
-            $dateFormatted = $closingDate->format("d-m-Y") . ' ' . $closingHours->format("H:i");
+            $dateFormatted = $closingDate->format('d-m-Y') . ' ' . $closingHours->format('H:i:s');
         } catch (\Exception $exception) {
             $dateFormatted = $this->document['lastmodified'];
         }
@@ -125,10 +162,11 @@ class OfferTicket extends Document
         $this->linebreak();
     }
 
-
-    /*****************************************************
+    /**
      * Add info about entities both customers or suppliers
-     *****************************************************/
+     *
+     * @return void
+     */
     public function entity()
     {
         $this->entityName();
@@ -138,6 +176,8 @@ class OfferTicket extends Document
 
     /**
      * Entity Name
+     *
+     * @return void
      */
     public function entityName()
     {
@@ -153,6 +193,8 @@ class OfferTicket extends Document
 
     /**
      * Entity VAT number
+     *
+     * @return void
      */
     public function entityVat()
     {
@@ -173,10 +215,12 @@ class OfferTicket extends Document
      * Zip Code
      * City
      * Country
+     *
+     * @return void
      */
     public function entityAddress()
     {
-        if ($this->hasAddress) {
+        if ($this->hasAddress && !$this->isFinalConsumer) {
             $this->builder->textFont('A');
             $this->builder->textAlign('LEFT');
             $this->builder->textStyle();
@@ -205,10 +249,11 @@ class OfferTicket extends Document
 
     }
 
-    /***************************************
+    /**
      * Add info about products in a document
-     ***************************************/
-
+     *
+     * @return void
+     */
     public function products()
     {
         $this->builder->addTittle($this->labels->products);
@@ -222,36 +267,60 @@ class OfferTicket extends Document
         $table->addLineSplit();
 
         foreach ($this->products as $productIndex => $product) {
-            $table->addCell($this->labels->reference_short . ' ' . $product['reference'], ['condensed' => true]);
-            $table->addCell($product['quantity'], ['alignment' => 'RIGHT']);
-            $table->newRow();
-            $table->addCell($product['name']);
-            $table->newRow();
-
-            if (!empty($product['summary'])) {
-                $table->addCell($product['summary'], ['condensed' => true]);
-                $table->newRow();
-            }
-
-            if ($productIndex < count($this->products) - 1) {
-                $table->addCells(['', '']);
-                $table->newRow();
-            }
+            $this->drawProduct($table, $productIndex, $product);
         }
+
         $table->addLineSplit();
         $table->drawTable();
         $this->linebreak();
     }
 
+    /**
+     * Draws a single product
+     *
+     * @param Table $table table
+     * @param int $productIndex current index on products
+     * @param array $product array with product information
+     *
+     * @return void
+     */
+    public function drawProduct(Table $table, $productIndex, $product)
+    {
+        $table->addCell($this->labels->reference_short . ' ' . $product['reference'], ['condensed' => true]);
+        $table->addCell($product['quantity'], ['alignment' => 'RIGHT']);
+        $table->newRow();
+        $table->addCell($product['name']);
+        $table->newRow();
+
+        if (!empty($product['summary'])) {
+            $table->addCell($product['summary'], ['condensed' => true]);
+            $table->newRow();
+        }
+
+        if ($productIndex < count($this->products) - 1) {
+            $table->addCells(['', '']);
+            $table->newRow();
+        }
+    }
+
+    /**
+     * Draws document footer
+     *
+     * @return void
+     */
     public function documentFooter()
     {
         if (isset($this->terminal['footer_gift']) && !empty($this->terminal['footer_gift'])) {
-            $this->linebreak();
             $this->builder->text($this->terminal['footer_gift']);
             $this->linebreak();
         }
     }
 
+    /**
+     * Draws notes
+     *
+     * @return void
+     */
     public function notes()
     {
         $this->builder->textFont('C');
@@ -269,13 +338,18 @@ class OfferTicket extends Document
         }
     }
 
+    /**
+     * Draws processed by section
+     *
+     * @return void
+     */
     public function processedBy()
     {
         $this->builder->textFont('C');
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
         $this->builder->textAlign('CENTER');
-        $this->builder->text($this->labels->processed_by);
+        $this->builder->text($this->labels->created_by_v2);
         $this->linebreak();
     }
 

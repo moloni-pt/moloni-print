@@ -91,6 +91,11 @@ class Printer
     public $copies = 1;
 
     /**
+     * @var string Alies of the printer
+     */
+    public $alias = '';
+
+    /**
      * Printers constructor.
      * @param $printer array
      */
@@ -173,6 +178,10 @@ class Printer
 
             if (isset($printer['imageType'])) {
                 $this->imageType = in_array($printer['imageType'], ['base64', 'default', 'path']) ? $printer['imageType'] : 'default';
+            }
+
+            if (isset($printer['alias'])) {
+                $this->alias = $printer['alias'];
             }
         }
     }

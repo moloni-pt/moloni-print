@@ -7,6 +7,7 @@ use MoloniPrint\Settings\Printer;
 
 use MoloniPrint\Jobs\Document;
 use MoloniPrint\Jobs\OfferTicket;
+use MoloniPrint\Jobs\OrderTicket;
 
 class Job
 {
@@ -52,6 +53,11 @@ class Job
     {
         $printingDocument = (new OfferTicket($this))->create($document, $products);
         return $printingDocument;
+    }
+
+    public function OrderTicket(Array $order)
+    {
+        return (new OrderTicket($this))->create($order);
     }
 
     public function Cashflow(Array $cashflow)

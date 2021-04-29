@@ -53,7 +53,7 @@ class Closing extends Cashflow
         $this->builder->textAlign('RIGHT');
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
-        $this->builder->text($this->labels->date . ': ' . Tools::dateFormat($this->cashflow['parent']['date']) . ' - ' . Tools::dateFormat($this->cashflow['date']));
+        $this->builder->text($this->labels->period . ': ' . Tools::dateFormat($this->cashflow['parent']['date']) . ' - ' . Tools::dateFormat($this->cashflow['date']));
         $this->linebreak();
     }
 
@@ -163,14 +163,22 @@ class Closing extends Cashflow
             if ($movement['type_id'] == 2) {
                 // For sales
                 $totalValue = $movement['value'];
+                $totalInvoicedLeft = $movement['value'];
                 $totalAssociatedValue = 0;
 
                 if (!empty($movement['payments']) && is_array($movement['payments'])) {
                     foreach ($movement['payments'] as $payment) {
+                        $paymentValue = $payment['value'];
+                        if ($paymentValue > $totalInvoicedLeft) {
+                            $paymentValue = $totalInvoicedLeft;
+                        }
+
                         $this->incoming[$payment['payment_method_id']]['name'] = $payment['payment_method']['name'];
-                        $this->incoming[$payment['payment_method_id']]['invoiced'] += $payment['value'];
+                        $this->incoming[$payment['payment_method_id']]['invoiced'] += $paymentValue;
                         $this->incoming[$payment['payment_method_id']]['declared'] += 0;
-                        $totalAssociatedValue += $payment['value'];
+
+                        $totalInvoicedLeft -= $paymentValue;
+                        $totalAssociatedValue += $paymentValue;
                     }
                 }
 

@@ -1,5 +1,23 @@
 <?php
 
+/*
+ * Moloni, lda
+ *
+ * Aviso de propriedade e confidencialidade
+ * A distribuição ou reprodução deste documento (codigo) para além dos fins
+ * a que o mesmo se destina só é permitida com o consentimento por escrito
+ * por parte da Moloni.
+ *
+ * PHP version 5
+ *
+ * @category  BO-CATEGORIA
+ * @package   BackOffice
+ * @author    Nuno Almeida <nuno@moloni.com>
+ * @copyright 2020 Moloni, lda
+ * @license   Moloni, lda
+ * @link      https://www.moloni.pt
+ */
+
 namespace MoloniPrint\Jobs;
 
 use DateTime;
@@ -8,6 +26,11 @@ use MoloniPrint\Job;
 use MoloniPrint\Table\Table;
 use MoloniPrint\Utils\Tools;
 
+/**
+ * Class Document
+ *
+ * @package MoloniPrint\Jobs
+ */
 class Document extends Common
 {
 
@@ -27,16 +50,18 @@ class Document extends Common
         'products',
         'taxes',
         'mbReferences',
-        'payments',
         'relatedDocuments',
+        'payments',
         'shippingDetails',
-        'notes',
-        'footer',
-        'documentFooter',
+        'linebreak',
         'productsCounter',
         'productsWithQuantityCounter',
         'linebreak',
         'productsAvailabilityNote',
+        'linebreak',
+        'notes',
+        'documentFooter',
+        'footer',
         'linebreak',
         'processedBy',
         'poweredBy',
@@ -51,6 +76,11 @@ class Document extends Common
     protected $productsWithQuantityCount = 0;
     protected $productsToPrint = [];
 
+    protected $hasDocumentFooter = false;
+
+    /**
+     * @var float
+     */
     protected $currentCopy = 1;
 
     /**
@@ -59,8 +89,14 @@ class Document extends Common
     protected $exchangeRate = 1;
 
     /**
+     * @var bool
+     */
+    private $showPrice = true;
+
+    /**
      * Document constructor.
-     * @param Job $job
+     *
+     * @param Job $job current job
      */
     public function __construct(Job $job)
     {
@@ -69,10 +105,12 @@ class Document extends Common
 
     /**
      * Start by setting class variables and parsing entities and products
-     * @param array $document
-     * @return array|string
+     *
+     * @param array $document the document to print
+     *
+     * @return array document in printed format in json
      */
-    public function create(Array $document)
+    public function create(array $document)
     {
         $this->document = $document;
 
@@ -86,6 +124,7 @@ class Document extends Common
             Tools::$symbolRight = $this->document['exchange_currency']['symbol_right'];
         }
 
+        $this->shouldShowPrices();
 
         $this->parseEntities();
         $this->parseProducts();
@@ -100,6 +139,8 @@ class Document extends Common
 
     /**
      * Draw block of document details and document identification
+     *
+     * @return void
      */
     public function documentDetails()
     {
@@ -117,18 +158,17 @@ class Document extends Common
      * Original or segunda via
      * Documento Type
      * Document Set Name / Document Number
+     *
+     * @return void
      */
     public function documentIdentification()
     {
         $this->builder->textStyle(false, false, false);
         $this->builder->textFont('C');
 
-        /* if (isset($this->document['second_way']) && $this->document['second_way']) {
-          $this->builder->text($this->labels->second_way);
-          } else {
-          $this->builder->text($this->labels->original);
-          }a
-         */
+        if (isset($this->document['second_way']) && $this->document['second_way']) {
+            $this->builder->text($this->labels->second_way . ' - ');
+        }
 
         if ($this->printer->copies > 1) {
             $this->builder->variable('#CopyNumber#');
@@ -151,6 +191,8 @@ class Document extends Common
      * Terminal Name
      * Operator Name
      * Salesman Name
+     *
+     * @return void
      */
     public function documentTerminal()
     {
@@ -162,9 +204,11 @@ class Document extends Common
         $this->builder->text($this->labels->operator . ': ' . $this->document['lastmodifiedby']);
         $this->linebreak();
 
-        if (isset($this->document['salesman_id']) && $this->document['salesman_id'] > 0) {
-            $this->builder->text($this->labels->salesman . ': ' . $this->document['salesman']['name']);
-            $this->linebreak();
+        if ((empty($this->terminal) || (int)$this->terminal['print_salesman'] === 1) && $this->company['docs_show_salesman']) {
+            if (isset($this->document['salesman_id']) && $this->document['salesman_id'] > 0) {
+                $this->builder->text($this->labels->salesman . ': ' . $this->document['salesman']['name']);
+                $this->linebreak();
+            }
         }
 
         if (isset($this->document['exchange_currency']['iso4217'])) {
@@ -175,6 +219,8 @@ class Document extends Common
 
     /**
      * Show our reference
+     *
+     * @return void
      */
     public function documentOurReference()
     {
@@ -187,6 +233,8 @@ class Document extends Common
 
     /**
      * Show your reference
+     *
+     * @return void
      */
     public function documentYourReference()
     {
@@ -199,14 +247,19 @@ class Document extends Common
 
     /**
      * Show document last modified date
+     *
+     * @return void
      */
     public function documentDate()
     {
         try {
-            $closingHours = new DateTime($this->document['lastmodified']);
             $closingDate = new DateTime($this->document['date']);
-
-            $dateFormatted = $closingDate->format('d-m-Y') . ' ' . $closingHours->format('H:i');
+            if ($this->terminal && $this->terminal['print_hour']) {
+                $closingHours = new DateTime($this->document['lastmodified']);
+                $dateFormatted = $closingDate->format('d-m-Y') . ' ' . $closingHours->format('H:i');
+            } else {
+                $dateFormatted = $closingDate->format('d-m-Y');
+            }
         } catch (Exception $exception) {
             $dateFormatted = $this->document['date'];
         }
@@ -218,6 +271,8 @@ class Document extends Common
 
     /**
      * Show document Shipping Code from AT
+     *
+     * @return void
      */
     public function documentShippingCode()
     {
@@ -229,19 +284,33 @@ class Document extends Common
     }
 
     /**
-     * @todo Add table information from another table
      * Area Name
      * Table Name
+     *
+     * @return void
      */
     public function documentTableIdentification()
     {
+        if (isset($this->document['associated_table']) && !empty($this->document['associated_table'])) {
+            $this->builder->textStyle(false, false, false);
+            if (isset($this->document['associated_table']['table']['area']['name']) && !empty($this->document['associated_table']['table']['area']['name'])) {
+                $this->builder->text($this->document['associated_table']['table']['area']['name']);
+                $this->linebreak();
+            }
 
+            if (isset($this->document['associated_table']['table']['name']) && !empty($this->document['associated_table']['table']['name'])) {
+                $table = $this->document['associated_table']['table'];
+                $this->builder->text($table['reference'] . ' - ' . $table['name']);
+                $this->linebreak();
+            }
+        }
     }
 
-    /*****************************************************
+    /**
      * Add info about entities both customers or suppliers
-     *****************************************************/
-
+     *
+     * @return void
+     */
     public function entity()
     {
         $this->entityName();
@@ -251,6 +320,8 @@ class Document extends Common
 
     /**
      * Entity Name
+     *
+     * @return void
      */
     public function entityName()
     {
@@ -263,6 +334,8 @@ class Document extends Common
 
     /**
      * Entity VAT number
+     *
+     * @return void
      */
     public function entityVat()
     {
@@ -280,10 +353,12 @@ class Document extends Common
      * Zip Code
      * City
      * Country
+     *
+     * @return void
      */
     public function entityAddress()
     {
-        if ($this->hasAddress) {
+        if ($this->hasAddress && !$this->isFinalConsumer) {
             $this->builder->textStyle(false, false, false);
 
             if (isset($this->document['entity_address']) && !empty($this->document['entity_address'])) {
@@ -309,19 +384,24 @@ class Document extends Common
 
     }
 
-    /***************************************
+    /**
      * Add info about products in a document
-     ***************************************/
-
+     *
+     * @return void
+     */
     public function products()
     {
         $this->drawProductsFull();
     }
 
+    /**
+     * Draws taxes section
+     *
+     * @return void
+     */
     public function taxes()
     {
-        if (!empty($this->taxes) || !empty($this->exemptions)) {
-            $this->linebreak();
+        if (($this->showPrice && !empty($this->taxes)) || !empty($this->exemptions)) {
             $this->builder->addTittle($this->labels->taxes);
             $this->linebreak();
 
@@ -366,6 +446,11 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw mb reference
+     *
+     * @return void
+     */
     public function mbReferences()
     {
         if (!empty($this->document['mb_references'])) {
@@ -396,6 +481,11 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw payments
+     *
+     * @return void
+     */
     public function payments()
     {
         if (!empty($this->document['payments'])) {
@@ -432,6 +522,11 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw related documents
+     *
+     * @return void
+     */
     public function relatedDocuments()
     {
         if (!empty($this->document['associated_documents']) && (int)$this->company['docs_show_related'] === 1) {
@@ -455,7 +550,8 @@ class Document extends Common
                 }
 
                 $documentName = $this->labels->document_types[$document['associated_document']['document_type_id']];
-                $table->addCell($documentName . ' ' . $document['associated_document']['document_set_name'] . '/' . $document['associated_document']['number'], ['condensed' => true]);
+                $table->addCell($documentName . ' ' . $document['associated_document']['document_set_name'] . '/' .
+                    $document['associated_document']['number'], ['condensed' => true]);
 
                 if ($this->printer->condensedWidth < 60) {
                     $table->newRow();
@@ -465,7 +561,7 @@ class Document extends Common
                 $table->addCell($dateFormatted, ['condensed' => true, 'alignment' => 'RIGHT']);
 
                 /* Hide the value from a global guide */
-                if((int)$document['associated_document']['global_guide'] === 1) {
+                if ((int)$document['associated_document']['global_guide'] === 1) {
                     $table->addCell('', ['condensed' => true, 'alignment' => 'RIGHT']);
                 } else {
                     $table->addCell(Tools::priceFormat($document['associated_document']['net_value'], $this->currency), ['condensed' => true, 'alignment' => 'RIGHT']);
@@ -480,6 +576,11 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw shipping details
+     *
+     * @return void
+     */
     public function shippingDetails()
     {
         if (!empty($this->document['delivery_datetime']) ||
@@ -515,7 +616,22 @@ class Document extends Common
                 $this->builder->textStyle(false, false, true);
                 $this->builder->text($this->labels->beginning . ': ');
                 $this->builder->textStyle(false, false, false);
-                $this->builder->text(Tools::dateFormat($this->document['delivery_datetime']));
+
+                if (isset($this->document['timezone']) && !empty($this->document['timezone'])) {
+                    $this->builder->text(Tools::dateFormat($this->document['delivery_datetime'], 'd-m-Y H:i', $this->document['timezone']['title']));
+
+                    $this->linebreak();
+                    $this->builder->textStyle(false, false, true);
+                    $this->builder->text($this->labels->time_zone . ': ');
+                    $this->builder->textStyle();
+                    $this->builder->text($this->document['timezone']['title'] . ' ');
+                    $this->builder->text(
+                        '(GMT ' . $this->document['timezone']['offset_multiplier'] .
+                        gmdate('H:i', $this->document['timezone']['offset']) . ')'
+                    );
+                } else {
+                    $this->builder->text(Tools::dateFormat($this->document['delivery_datetime']));
+                }
             }
 
             if (!empty($this->document['delivery_departure_address']) ||
@@ -526,10 +642,22 @@ class Document extends Common
                 $this->builder->textStyle(false, false, true);
                 $this->builder->text($this->labels->departure_place . ':');
                 $this->builder->textStyle(false, false, false);
-                $this->builder->text(' ' . $this->document['delivery_departure_address']);
-                $this->builder->text(', ' . $this->document['delivery_departure_zip_code']);
-                $this->builder->text(' ' . $this->document['delivery_departure_city']);
-                $this->builder->text(', ' . $this->document['delivery_departure_country_details']['name']);
+
+                if (!empty($this->document['delivery_departure_address'])) {
+                    $this->builder->text(' ' . $this->document['delivery_departure_address']);
+                }
+
+                if (!empty($this->document['delivery_departure_zip_code'])) {
+                    $this->builder->text(', ' . $this->document['delivery_departure_zip_code']);
+                }
+
+                if (!empty($this->document['delivery_departure_city'])) {
+                    $this->builder->text(' ' . $this->document['delivery_departure_city']);
+                }
+
+                if (!empty($this->document['delivery_departure_country_details_city'])) {
+                    $this->builder->text(', ' . $this->document['delivery_departure_country_details']['name']);
+                }
             }
 
             if (!empty($this->document['delivery_destination_address']) ||
@@ -561,6 +689,11 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw product counter
+     *
+     * @return void
+     */
     public function productsCounter()
     {
         if ($this->terminal['print_qty_of_products_rows']) {
@@ -572,6 +705,11 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw products counter
+     *
+     * @return void
+     */
     public function productsWithQuantityCounter()
     {
         if ($this->terminal['print_qty_of_products']) {
@@ -583,6 +721,11 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw availability note
+     *
+     * @return void
+     */
     public function productsAvailabilityNote()
     {
         try {
@@ -599,32 +742,60 @@ class Document extends Common
         $this->linebreak();
     }
 
+    /**
+     * Draw processed by section
+     *
+     * @return void
+     */
     public function processedBy()
     {
         $this->builder->textFont('C');
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
         $this->builder->textAlign('CENTER');
+
+        if ((int)$this->company['docs_qr_code_position'] !== 3 && $this->document['qr_code'] && !empty($this->document['qr_code']['url'])) {
+            $this->builder->image($this->document['qr_code']['url'], $this->printer->dotWidth, 'qr');
+            $this->linebreak();
+        }
+
+        $oldCertificate = ((int)$this->document['hash_control'] === 1 || (int)$this->document['hash_control'] === 0);
+
         if (!empty($this->document['rsa_hash'])) {
             $hash = $this->document['rsa_hash'][0];
             $hash .= $this->document['rsa_hash'][10];
             $hash .= $this->document['rsa_hash'][20];
             $hash .= $this->document['rsa_hash'][30];
             $this->builder->text($hash . ' - ');
+
+            $this->builder->text($oldCertificate ? $this->labels->processed_by : $this->labels->processed_by_v2);
+        } else {
+            $this->builder->text($oldCertificate ? $this->labels->created_by : $this->labels->created_by_v2);
         }
-        $this->builder->text($this->labels->processed_by);
+
         $this->linebreak();
     }
 
+    /**
+     * Draw notes
+     *
+     * @return void
+     */
     public function notes()
     {
-        $this->linebreak();
         // Credit notes require a customer signature
         if ($this->document['document_type']['saft_code'] === 'NC') {
             $this->signature();
         }
 
+        if (in_array($this->document['document_type']['saft_code'], $this->documentsAreNotValidInvoices, true)) {
+            $this->builder->textStyle(false, false, true);
+            $this->builder->text($this->labels->document_is_not_invoice);
+            $this->linebreak();
+        }
+
         if (!empty($this->document['notes'])) {
+            $this->builder->textStyle();
             $this->builder->textFont('A');
             $this->builder->textDouble();
             $this->builder->textAlign();
@@ -635,6 +806,35 @@ class Document extends Common
         }
     }
 
+    /**
+     * Draw document footer
+     *
+     * @return void
+     */
+    public function documentFooter()
+    {
+        // If the document is a FT, FS or FR print the terminal message
+        if (!empty($this->terminal['document_settings']) && is_array($this->terminal['document_settings'])) {
+            foreach ($this->terminal['document_settings'] as $documentSetting) {
+                if ($documentSetting['document_type_id'] == $this->document['document_type_id'] && !empty($documentSetting['footer'])) {
+                    $this->hasDocumentFooter = true;
+
+                    $this->builder->textFont('C');
+                    $this->builder->textDouble();
+                    $this->builder->textAlign();
+                    $this->builder->textStyle();
+                    $this->builder->text($documentSetting['footer']);
+                    $this->linebreak();
+                }
+            }
+        }
+    }
+
+    /**
+     * Draw footer
+     *
+     * @return void
+     */
     public function footer()
     {
         if (isset($this->document['document_set']['template']['documents_footnote'])) {
@@ -643,9 +843,8 @@ class Document extends Common
             $footer = trim(strip_tags($this->company['docs_footer']));
         }
 
-
-        if (!empty($footer)) {
-            $this->builder->textFont('A');
+        if (!empty($footer) && !$this->hasDocumentFooter) {
+            $this->builder->textFont('C');
             $this->builder->textDouble();
             $this->builder->textAlign();
             $this->builder->textStyle();
@@ -655,26 +854,15 @@ class Document extends Common
         }
     }
 
-    public function documentFooter()
-    {
-        // If the document is a FT, FS or FR print the terminal message
-        if (!empty($this->terminal['document_settings']) && is_array($this->terminal['document_settings'])) {
-            foreach ($this->terminal['document_settings'] as $documentSetting) {
-                if ($documentSetting['document_type_id'] == $this->document['document_type_id'] && !empty($documentSetting['footer'])) {
-                    $this->linebreak();
-                    $this->builder->text($documentSetting['footer']);
-                    $this->linebreak();
-                }
-            }
-        }
-    }
-
-    /******************************************
+    /**
      * Methods to draw a full list of products
      * If we want to add more kind of lists
-     ******************************************/
+     *
+     * @return void
+     */
     public function drawProductsFull()
     {
+        $this->builder->textStyle();
         if (is_array($this->products) && !empty($this->products)) {
             $this->linebreak();
             $this->builder->textFont('C');
@@ -704,26 +892,41 @@ class Document extends Common
         }
     }
 
+    /**
+     * Nome
+     * Quantidade
+     * Preço Unitário
+     * Desconto
+     * IVA
+     * Preço Total
+     *
+     * @param Table $table the table reference
+     *
+     * @return void
+     */
     private function drawProductsFullHeader(Table &$table)
     {
         $table->addColumn();
         $table->addColumn(7);
 
-        if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
+        if ($this->showPrice) {
+            if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
+                $table->addColumn(14);
+            }
+
+            if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
+                $table->addColumn(8);
+            }
+
+            if ($this->printer->condensedWidth > 48) {
+                $table->addColumn(10);
+            } else {
+                $table->addColumn(6);
+            }
+
             $table->addColumn(14);
         }
 
-        if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
-            $table->addColumn(8);
-        }
-
-        if ($this->printer->condensedWidth > 48) {
-            $table->addColumn(10);
-        } else {
-            $table->addColumn(6);
-        }
-
-        $table->addColumn(14);
 
         $headerStyle = [
             'emphasized' => true,
@@ -733,33 +936,61 @@ class Document extends Common
 
         $table->addCell('', $headerStyle);
         $table->addCell($this->labels->qty, $headerStyle);
-        if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
-            $table->addCell($this->labels->pvp_unit_short, $headerStyle);
-        }
 
-        if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
-            $table->addCell($this->labels->discount_short, $headerStyle);
-        }
+        if ($this->showPrice) {
+            if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
+                $table->addCell($this->labels->pvp_unit_short, $headerStyle);
+            }
 
-        $table->addCell($this->labels->iva, $headerStyle);
-        $table->addCell($this->labels->total, $headerStyle);
+            if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
+                $table->addCell($this->labels->discount_short, $headerStyle);
+            }
+
+            $table->addCell($this->labels->iva, $headerStyle);
+            $table->addCell($this->labels->total, $headerStyle);
+        }
     }
 
-    private function drawProductsFullLine(Table $table, $product)
+    /**
+     * Draws product line
+     *
+     * @param Table $table the table reference
+     * @param array $product product to print
+     * @param bool $isChildProduct if the current product is a child ou parent
+     *
+     * @return void
+     */
+    private function drawProductsFullLine(Table $table, $product, $isChildProduct = false)
     {
-        $description = $this->terminal['print_products_reference'] ? $product['reference'] . ' ' : '';
+        $description = '';
+
+        if ($isChildProduct) {
+            $description .= '  - ';
+        }
+
+        $description .= $this->terminal['print_products_reference'] ? $product['reference'] . ' ' : '';
         $description .= $product['name'];
+
         $table->addCell($description);
         $table->newRow();
 
-        if (
-            !empty($product['summary']) && (
+        if (!empty($product['summary']) && (
                 (!isset($this->terminal['print_products_summary']) && $this->company['docs_show_products_summary']) ||
                 $this->terminal['print_products_summary']
             )) {
             $table->addCell($product['summary'], ['condensed' => true]);
             $table->newRow();
+        }
 
+        if (isset($product['properties']) && $product['properties'] !== '') {
+            $propertiesJson = json_decode($product['properties'], true);
+
+            if (is_array($propertiesJson) && count($propertiesJson) > 0) {
+                foreach ($propertiesJson as $property) {
+                    $table->addCell($property['titulo'] . ': ' . $property['valor'], ['condensed' => true]);
+                    $table->newRow();
+                }
+            }
         }
 
         $bodyStyle = [
@@ -769,32 +1000,90 @@ class Document extends Common
         $table->addCell('');
         $table->addCell($product['quantity'], $bodyStyle);
 
-        if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
-            if ($this->company['docs_show_unit_price_with_taxes'] == 1) {
-                $table->addCell($product['unitPriceWithTaxes'], $bodyStyle);
+        if ($this->showPrice) {
+            if ($this->printer->condensedWidth > $this->ultraSmallWidth) {
+                if ($this->company['docs_show_unit_price_with_taxes'] == 1) {
+                    $table->addCell($product['unitPriceWithTaxes'], $bodyStyle);
+                } else {
+                    $table->addCell($product['unitPrice'], $bodyStyle);
+                }
+            }
+
+            if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
+                $table->addCell($product['discount'], $bodyStyle);
+            }
+
+            if (is_array($product['tax'])) {
+                $table->addCell($product['tax'][0], $bodyStyle);
             } else {
-                $table->addCell($product['unitPrice'], $bodyStyle);
+                $table->addCell($product['tax'], $bodyStyle);
+            }
+
+            if ($this->company['docs_show_values_with_taxes'] == 1) {
+                $table->addCell($product['totalPriceWithTaxes'], $bodyStyle);
+            } else {
+                $table->addCell($product['totalPrice'], $bodyStyle);
+            }
+
+            if (is_array($product['tax']) && count($product['tax']) > 1) {
+                for ($i = 1, $iMax = count($product['tax']); $i < $iMax; $i++) {
+                    $table->newRow();
+                    $table->addCells(['', '', '', $product['tax'][$i], ''], $bodyStyle);
+                }
             }
         }
 
-        if ($this->printer->condensedWidth > 48 && $this->document['comercial_discount_value'] > 0) {
-            $table->addCell($product['discount'], $bodyStyle);
+        if ((empty($this->terminal) || (int)$this->terminal['print_products_childs'] === 1) && isset($product['child_products'])) {
+            foreach ($product['child_products'] as $childProduct) {
+                $this->drawProductsFullLine($table, $childProduct, true);
+            }
         }
 
-        $table->addCell($product['tax'], $bodyStyle);
-
-        if ($this->company['docs_show_values_with_taxes'] == 1) {
-            $table->addCell($product['totalPriceWithTaxes'], $bodyStyle);
-        } else {
-            $table->addCell($product['totalPrice'], $bodyStyle);
-        }
-
+        $this->productsCount++;
     }
 
+    /**
+     * Gets the longest word size
+     *
+     * @param array $words words
+     * @param int $min minimum size of word
+     *
+     * @return int size of longest word
+     */
+    protected function getLongestWord($words = [], $min = 14)
+    {
+        $longest = 0;
+
+        foreach ($words as $word) {
+            if (mb_strlen($word) > $longest) {
+                $longest = mb_strlen($word);
+            }
+        }
+
+        return $longest > $min ? $longest : $min;
+    }
+
+    /**
+     * Draws product resume
+     *
+     * @return Document current instance
+     */
     private function drawProductsFullResume()
     {
+        if (!$this->showPrice) {
+            return $this;
+        }
+
         $table = new Table($this->builder, $this->printer);
-        $table->addColumns([null, 20]);
+
+        $valuesList = [
+            Tools::priceFormat($this->document['gross_value']),
+            Tools::priceFormat($this->document['financial_discount_value']),
+            Tools::priceFormat($this->document['comercial_discount_value']),
+            Tools::priceFormat($this->document['net_value'])
+        ];
+
+        $table->addColumns([null, $this->getLongestWord($valuesList)]);
         $table->addCell($this->labels->gross_total, ['alignment' => 'RIGHT']);
         $table->addCell(Tools::priceFormat($this->document['gross_value']), ['alignment' => 'RIGHT']);
 
@@ -832,10 +1121,16 @@ class Document extends Common
 
         $table->drawTable();
         $this->linebreak();
+
+        return $this;
     }
 
     /**
-     * @param Table $table
+     * Draws products exchange rates
+     *
+     * @param Table $table table to draw
+     *
+     * @return void
      */
     private function drawProductsResumeExchangeRates(Table $table)
     {
@@ -855,109 +1150,168 @@ class Document extends Common
 
         $table->addCell($this->labels->exchange_rate, ['alignment' => 'RIGHT', 'condensed' => true]);
         $exchangeRateString = Tools::priceFormat(
-                1,
-                '€',
-                2,
-                ',',
-                '.',
-                $this->company['currency']['symbol_right'],
-                1
-            ) . '=' . Tools::priceFormat(1);
+            1,
+            '€',
+            2,
+            ',',
+            '.',
+            $this->company['currency']['symbol_right'],
+            1
+        ) . '=' . Tools::priceFormat(1);
 
         $table->addCell(html_entity_decode($exchangeRateString), ['alignment' => 'RIGHT', 'condensed' => true]);
     }
 
+    /**
+     * Parses document entities
+     *
+     * @return void
+     */
     protected function parseEntities()
     {
-        if ($this->company['country_id'] == 1 &&
-            trim($this->document['entity_vat']) == '999999990' &&
+        if ((int)$this->company['country_id'] === 1 &&
+            trim((string)$this->document['entity_vat']) === '999999990' &&
             trim($this->document['entity_name']) === 'Consumidor Final') {
             $this->isFinalConsumer = true;
         }
 
-        if ($this->document['entity_country_id'] == 1 &&
-            $this->document['entity_address'] == 'Desconhecido' &&
-            $this->document['entity_city'] == 'Desconhecido' &&
-            $this->document['entity_zip_code'] == '0000-000') {
+        if ((int)$this->document['entity_country_id'] === 1 &&
+            $this->document['entity_address'] === 'Desconhecido' &&
+            $this->document['entity_city'] === 'Desconhecido' &&
+            (string)$this->document['entity_zip_code'] === '0000-000') {
             $this->hasAddress = false;
         }
     }
 
-
     /**
      * Parse products into a object we can use to print
+     *
+     * @return void
      */
     protected function parseProducts()
     {
-        foreach ($this->document['products'] as $raw) {
+        if (isset($this->document['products']) && is_array($this->document['products'])) {
+            foreach ($this->document['products'] as $raw) {
 
-            if (!empty($this->productsToPrint) && is_array($this->productsToPrint)) {
-                $print = false;
-                foreach ($this->productsToPrint as $productToPrint) {
-                    if ($raw['product_id'] == $productToPrint['product_id']) {
-                        if (isset($productToPrint['qty'])) {
-                            $raw['qty'] = (int)$productToPrint['qty'];
+                if (!empty($this->productsToPrint) && is_array($this->productsToPrint)) {
+                    $print = false;
+
+                    foreach ($this->productsToPrint as $productToPrint) {
+                        if ((int)$raw['product_id'] === (int)$productToPrint['product_id']) {
+                            if (isset($productToPrint['qty'])) {
+                                $raw['qty'] = round($productToPrint['qty'], 2);
+                            }
+
+                            $print = true;
                         }
-                        $print = true;
+                    }
+
+                    if (!$print) {
+                        continue;
                     }
                 }
 
-                if (!$print) {
-                    continue;
-                }
+                $product = $this->parseProduct($raw);
+
+                $this->products[] = $product;
+
+                $this->productsWithQuantityCount += $product['quantity'];
             }
-
-            $product = [
-                'reference' => $raw['reference'],
-                'name' => $raw['name'],
-                'summary' => $raw['summary'],
-                'discount' => $raw['discount'],
-                'unitPrice' => $raw['price'],
-                'unitPriceWithTaxes' => $raw['price'],
-                'quantity' => $raw['qty']
-            ];
-
-            $product['unitPriceWithDiscounts'] = ($raw['price'] * (100 - $raw['discount'])) / 100;
-
-            $product['totalPrice'] = ($product['unitPriceWithDiscounts'] * $raw['qty']);
-            $product['totalPriceWithTaxes'] = ($product['unitPriceWithDiscounts'] * $raw['qty']);
-
-            if (isset($raw['taxes']) && !empty($raw['taxes'])) {
-                $originalIncidenceValue = $raw['price'];
-                foreach ($raw['taxes'] as $tax) {
-                    $this->taxes[$tax['name']]['value'] = $tax['value'];
-                    $this->taxes[$tax['name']]['incidence'] += $tax['incidence_value'];
-                    $this->taxes[$tax['name']]['total'] += $tax['total_value'];
-                    $product['unitPriceWithTaxes'] += ((int)$tax['type'] === 1) ? ($originalIncidenceValue * ($tax['value'] / 100)) : ($tax['total_value'] / $raw['qty']);
-                    $product['totalPriceWithTaxes'] += $tax['total_value'];
-                    $product['tax'] = $tax['value'] . ($tax['type'] == 1 ? '%' : $this->currency);
-                }
-            } else {
-                if (!empty($raw['exemption_reason'])) {
-                    $this->exemptions[$raw['exemption_reason']]['description'] = $this->labels->exemption_reasons[$raw['exemption_reason']];
-                    $this->exemptions[$raw['exemption_reason']]['incidence'] += $product['unitPrice'];
-                    $this->exemptions[$raw['exemption_reason']]['total'] = 0;
-                }
-                $product['tax'] = '0%';
-            }
-
-            if (isset($raw['deduction']) && $raw['deduction'] > 0) {
-                $this->deductions[$raw['deduction_name']] = ($product['unitPriceWithDiscounts'] * $raw['deduction']) / 100;
-            }
-
-            $product['discount'] = (float)round($product['discount'], 2) . '%';
-            $product['unitPrice'] = Tools::priceFormat($product['unitPrice'], $this->currency);
-            $product['unitPriceWithTaxes'] = Tools::priceFormat($product['unitPriceWithTaxes'], $this->currency);
-            $product['totalPrice'] = Tools::priceFormat($product['totalPrice'], $this->currency);
-            $product['totalPriceWithTaxes'] = Tools::priceFormat($product['totalPriceWithTaxes'], $this->currency);
-
-            $this->products[] = $product;
-
-            $this->productsCount++;
-            $this->productsWithQuantityCount += $product['quantity'];
         }
     }
 
+    /**
+     * Parse a single product
+     *
+     * @param array $raw raw product to parse
+     *
+     * @return array product ready to print
+     */
+    protected function parseProduct($raw)
+    {
+        $product = [
+            'reference' => $raw['reference'],
+            'name' => $raw['name'],
+            'summary' => $raw['summary'],
+            'discount' => $raw['discount'],
+            'unitPrice' => $raw['price'],
+            'unitPriceWithTaxes' => $raw['price'],
+            'quantity' => $raw['qty']
+        ];
+
+        $product['unitPriceWithDiscounts'] = ($raw['price'] * (100 - $raw['discount'])) / 100;
+
+        $product['totalPrice'] = ($product['unitPriceWithDiscounts'] * $raw['qty']);
+        $product['totalPriceWithTaxes'] = ($product['unitPriceWithDiscounts'] * $raw['qty']);
+
+        if (isset($raw['taxes']) && !empty($raw['taxes'])) {
+            $originalIncidenceValue = $raw['price'];
+            foreach ($raw['taxes'] as $tax) {
+                $this->taxes[$tax['name']]['value'] = $tax['value'];
+                $this->taxes[$tax['name']]['incidence'] += $tax['incidence_value'];
+                $this->taxes[$tax['name']]['total'] += $tax['total_value'];
+                $product['unitPriceWithTaxes'] += ((int)$tax['type'] === 1) ? ($originalIncidenceValue * ($tax['value'] / 100)) : ($tax['total_value'] / $raw['qty']);
+                $product['totalPriceWithTaxes'] += $tax['total_value'];
+                $product['tax'] = $tax['value'] . ($tax['type'] == 1 ? '%' : $this->currency);
+            }
+        } else {
+            if (!empty($raw['exemption_reason'])) {
+                $this->exemptions[$raw['exemption_reason']]['description'] = $this->labels->exemption_reasons[$raw['exemption_reason']];
+                $this->exemptions[$raw['exemption_reason']]['incidence'] += $product['unitPrice'];
+                $this->exemptions[$raw['exemption_reason']]['total'] = 0;
+            }
+            $product['tax'] = '0%';
+        }
+
+        if (isset($raw['deduction']) && $raw['deduction'] > 0) {
+            $this->deductions[$raw['deduction_name']] = ($product['unitPriceWithDiscounts'] * $raw['deduction']) / 100;
+        }
+
+        $product['discount'] = (float)round($product['discount'], 2) . '%';
+        $product['unitPrice'] = Tools::priceFormat($product['unitPrice'], $this->currency);
+        $product['unitPriceWithTaxes'] = Tools::priceFormat($product['unitPriceWithTaxes'], $this->currency);
+        $product['totalPrice'] = Tools::priceFormat($product['totalPrice'], $this->currency);
+        $product['totalPriceWithTaxes'] = Tools::priceFormat($product['totalPriceWithTaxes'], $this->currency);
+
+        if (isset($raw['properties'])) {
+            $product['properties'] = $raw['properties'];
+        }
+
+        if (isset($raw['child_products']) && !empty($raw['child_products'])) {
+
+            $product['child_products'] = [];
+            foreach ($raw['child_products'] as $childProduct) {
+                $product['child_products'][] = $this->parseProduct($childProduct);
+            }
+
+            if (empty($this->terminal) || (int)$this->terminal['print_products_childs'] === 1) {
+                $product['tax'] = '0%';
+            } else {
+                $product['tax'] = [];
+                foreach ($raw['child_products'] as $child_product) {
+                    foreach ($child_product['taxes'] as $tax) {
+                        $tempTax = $tax['value'] . ((int)$tax['type'] === 1 ? '%' : $this->currency);
+
+                        if (!in_array($tempTax, $product['tax'], true)) {
+                            $product['tax'][] = $tempTax;
+                        }
+                    }
+                }
+
+                if (empty($product['tax'])) {
+                    $product['tax'] = '0%';
+                }
+            }
+        }
+
+        return $product;
+    }
+
+    /**
+     * Parse qty of copies
+     *
+     * @return void
+     */
     protected function parseCopies()
     {
         $copies = 0;
@@ -995,4 +1349,27 @@ class Document extends Common
         $this->printer->copies = $copies;
     }
 
+    /**
+     * Check if prices should be shown
+     *
+     * @return void
+     */
+    private function shouldShowPrices()
+    {
+        if (!$this->company['docs_show_values_on_orders_docs'] && (int)$this->document['document_type_id'] === 28) {
+            $this->showPrice = false;
+        }
+
+        if (!$this->company['docs_show_values_on_service_sheets'] && (int)$this->document['document_type_id'] === 30) {
+            $this->showPrice = false;
+        }
+
+        if (!$this->company['docs_show_values_on_movement_docs'] && (int)$this->document['document_type_id'] === 6) {
+            $this->showPrice = false;
+        }
+
+        if (!$this->company['docs_show_values_on_return_docs'] && in_array($this->document['document_type_id'], [32, 16, 31])) {
+            $this->showPrice = false;
+        }
+    }
 }

@@ -48,7 +48,7 @@ class Detailed extends Cashflow
      * Document constructor.
      * @param Job $job
      */
-    public function __construct(Job &$job)
+    public function __construct(Job $job)
     {
         parent::__construct($job);
     }
@@ -268,9 +268,20 @@ class Detailed extends Cashflow
 
                 if ($totalValue > $totalAssociatedValue) {
                     $this->{$parseForDirection}[0]['name'] = $this->labels->undifferentiated;
-                    $this->{$parseForDirection}[0]['value'] += $totalValue - $totalAssociatedValue - $movement['exchange_value'];
+                    $this->{$parseForDirection}[0]['value'] += $totalValue - $totalAssociatedValue - $movement['exchange'];
                 }
 
+                if ((float)$movement['exchange'] > 0) {
+                    $this->{$parseForDirection}['exchange']['name'] = 'Troco';
+                    $this->{$parseForDirection}['exchange']['value'] -= $movement['exchange'];
+                }
+            }
+
+            /** Show the exchange value in the bottom of list */
+            if (isset($this->{$parseForDirection}['exchange'])) {
+                $temp = $this->{$parseForDirection}['exchange'];
+                unset($this->{$parseForDirection}['exchange']);
+                $this->{$parseForDirection}['exchange'] = $temp;
             }
         }
     }

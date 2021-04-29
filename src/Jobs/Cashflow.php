@@ -82,7 +82,7 @@ class Cashflow extends Common
         $this->builder->textDouble();
         $this->builder->textStyle(false, false, true);
         $this->builder->textAlign('CENTER');
-        $this->builder->text($this->labels->processed_by);
+        $this->builder->text($this->labels->created_by_v2);
         $this->linebreak();
     }
 
